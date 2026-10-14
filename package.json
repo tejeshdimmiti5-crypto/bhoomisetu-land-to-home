@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:geometry": "node scripts/run-geometry-tests.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
