@@ -26,6 +26,7 @@ export interface GeometryOptions {
 const QUANTUM = 0.001;
 const DEFAULT_MIN_EDGE_M = 0.001;
 const DEFAULT_MIN_AREA_M2 = 0.0001;
+const DEFAULT_MIN_EFFECTIVE_WIDTH_M = 0.01;
 const EPSILON = 1e-9;
 
 function roundHalfAwayFromZero(value: number): number {
@@ -154,6 +155,13 @@ export function measurePolygon(input: unknown, options: GeometryOptions = {}): P
   for (let i = 0; i < ring.length; i += 1) {
     const next = ring[(i + 1) % ring.length];
     perimeterM += Math.hypot(next[0] - ring[i][0], next[1] - ring[i][1]);
+  }
+
+  // 2A/P is an effective-width proxy: it rejects extremely thin slivers
+  // without pretending to compute a true polygon inradius.
+  const effectiveWidthM = (2 * areaM2) / perimeterM;
+  if (effectiveWidthM + EPSILON < DEFAULT_MIN_EFFECTIVE_WIDTH_M) {
+    throw new Error(`Polygon is too narrow; effective width must be at least ${DEFAULT_MIN_EFFECTIVE_WIDTH_M} m.`);
   }
 
   return {
