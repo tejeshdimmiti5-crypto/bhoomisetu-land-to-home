@@ -33,3 +33,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# Temporary TypeScript output from geometry tests
+.test-dist/
