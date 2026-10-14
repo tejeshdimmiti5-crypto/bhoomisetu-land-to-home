@@ -14,7 +14,7 @@ BhoomiSetu is being developed in stages. The immediate goal is a reliable, mobil
 
 ### Storage strategy
 
-Choose local-first versus cloud before implementing persistence. Recommended MVP: local-first project storage (for example, IndexedDB) with explicit JSON export/import and recovery guidance. Add cloud sync only with a documented conflict-resolution strategy. If cloud persistence is chosen earlier, authentication and per-user authorization must be implemented alongside it—not deferred until public launch.
+Choose local-first versus cloud before implementing persistence. Recommended MVP: local-first project storage (for example, IndexedDB) with explicit JSON export/import and recovery guidance. Request persistent browser storage where supported, display storage status, and treat JSON export as the primary recovery safety net because browser storage can be evicted. Add cloud sync only with a documented conflict-resolution strategy. If cloud persistence is chosen earlier, authentication and per-user authorization must be implemented alongside it—not deferred until public launch.
 
 ### Measurement data contract
 
@@ -29,7 +29,7 @@ Every saved plot must include:
 - a record version for optimistic concurrency when concurrent edits are supported
 - deletion/audit metadata where required
 
-Round coordinates stored in the local planar model to 1 mm; calculate from the stored rounded vertices, while formatting display values separately. Keep one authoritative geometry engine (planned: backend when the API is introduced), and use shared JSON test vectors to keep any browser preview consistent. Validate invalid/self-intersecting polygons before accepting a plot.
+Round coordinates stored in the local planar model to 1 mm; calculate from the stored rounded vertices, while formatting display values separately. For the local-first MVP, the TypeScript geometry module is authoritative because it is the only runtime used by the frontend. If/when FastAPI is introduced, decide explicitly whether to move authority to the backend; any second implementation must pass the same shared JSON test vectors. Validate invalid/self-intersecting polygons before accepting a plot.
 
 ### Units
 
@@ -63,10 +63,10 @@ Open http://localhost:3000. This command is documented setup guidance; it is not
 ### Phase 0 — Reconcile and establish a green baseline
 1. Locate and preserve the earlier prototype source and its 14-test suite.
 2. Port existing geometry tests and representative fixtures into this repo before rewriting geometry.
-3. Add GitHub Actions CI immediately; require the available test suite and frontend build/lint checks to run on every pull request and push.
+3. Add GitHub Actions CI immediately; require lint, TypeScript type-check and frontend build on every pull request and push. Add test commands when real test suites are present; do not treat an empty test runner as evidence of coverage.
 4. Establish localization infrastructure before adding many screens; start with English and Telugu.
 5. Audit dependency and map-data licenses before adding dependencies.
-6. Replace the contact placeholder in the proprietary license with a public contact address, or remove the placeholder by choosing a reviewed permissions process.
+6. Review the proprietary license with an IP professional before commercial use; the current permission-request section directs enquiries to the repository issue channel, which must not be used for confidential information.
 
 ### Phase 1 — Land Studio MVP
 - Implement plot drawing/editing and touch-friendly vertex handles.
