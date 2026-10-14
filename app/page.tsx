@@ -116,6 +116,7 @@ export default function HomePage() {
             </div>
           </section>
 
+          <div className="demo-notice" role="note"><strong>Preview dashboard</strong><span>Sample projects and metrics are illustrative. Creating a project is not persistent yet.</span></div>
           <section className="stats-grid" aria-label="Workspace summary">
             <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Demo metric</small></article>
             <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>Demo metric</small></article>
