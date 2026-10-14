@@ -39,7 +39,7 @@ test("rejects a closed ring instead of silently normalizing it", () => {
 });
 
 test("rejects sliver polygons below the area floor", () => {
-  assert.throws(() => measurePolygon([[0, 0], [10, 0], [10, 0.001], [0, 0.001]]), /area must be at least/);
+  assert.throws(() => measurePolygon([[0, 0], [10, 0], [10, 0.001], [0, 0.001]]), /effective width must be at least/);
 });
 
 test("rejects a self-intersecting bow-tie", () => {
