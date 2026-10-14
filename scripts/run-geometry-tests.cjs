@@ -7,7 +7,6 @@ const outputDir = ".test-dist";
 fs.rmSync(outputDir, { recursive: true, force: true });
 const tsc = process.platform === "win32" ? "npx.cmd" : "npx";
 const compile = spawnSync(tsc, [
-  "tsc",
   "--target", "ES2020",
   "--module", "commonjs",
   "--moduleResolution", "node",
