@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
-  FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, Search, ShieldCheck,
+  FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
   Sparkles, Trees, Wallet, X, Check, Clock3, MoveUpRight
 } from "lucide-react";
 
@@ -83,7 +83,7 @@ export default function HomePage() {
           <button className="icon-button mobile-menu" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Menu size={21} /></button>
           <div className="breadcrumb">Workspace <span>/</span> <strong>Overview</strong></div>
           <div className="topbar-actions">
-            <span className="save-status"><span /> All changes saved</span>
+            <span className="save-status demo-status"><span /> Demo data · not saved</span>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={19} /><i /></button>
             <div className="top-avatar">TD</div>
           </div>
@@ -117,10 +117,10 @@ export default function HomePage() {
           </section>
 
           <section className="stats-grid" aria-label="Workspace summary">
-            <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Your land projects</small></article>
-            <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>One idea taking shape</small></article>
-            <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>—</strong><small>Start an estimate anytime</small></article>
-            <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Next milestone</span><strong className="stat-date">Plot setup</strong><small><Clock3 size={13} /> Ready when you are</small></article>
+            <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Demo metric</small></article>
+            <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>Demo metric</small></article>
+            <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>—</strong><small>Not connected yet</small></article>
+            <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Next milestone</span><strong className="stat-date">Plot setup</strong><small><Clock3 size={13} /> Demo status</small></article>
           </section>
 
           <section className="projects-section" id="projects">
