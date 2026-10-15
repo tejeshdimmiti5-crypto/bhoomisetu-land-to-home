@@ -23,6 +23,10 @@ export default function LandStudioPage() {
   const [busy, setBusy] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
   const [drawPoints, setDrawPoints] = useState<Point2D[]>([]);
+  const [captureMethod, setCaptureMethod] = useState<"manual" | "gps">("manual");
+  const [gpsOrigin, setGpsOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsBusy, setGpsBusy] = useState(false);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -84,6 +88,33 @@ export default function LandStudioPage() {
     setNotice("Boundary drawn. Review the measurements and save your plot.");
   }
 
+  function captureGpsCorner() {
+    if (!navigator.geolocation) { setError("This browser does not support GPS location. Use manual drawing instead."); return; }
+    if (ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    setGpsBusy(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition((position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const origin = gpsOrigin ?? { latitude, longitude };
+      const radians = Math.PI / 180;
+      const earthRadiusM = 6371008.8;
+      const x = earthRadiusM * Math.cos(origin.latitude * radians) * (longitude - origin.longitude) * radians;
+      const y = earthRadiusM * (latitude - origin.latitude) * radians;
+      const nextRing: Point2D[] = gpsOrigin ? [...ring, [Number(x.toFixed(3)), Number(y.toFixed(3))]] : [[0, 0]];
+      setGpsOrigin(origin);
+      setGpsAccuracy(accuracy);
+      setCaptureMethod("gps");
+      setDrawMode(false);
+      setRing(nextRing);
+      setActiveId(undefined);
+      setNotice(accuracy > 10 ? `GPS corner captured with ±${Math.round(accuracy)} m reported accuracy. This may be too imprecise for boundary surveying.` : `GPS corner captured (reported accuracy ±${Math.round(accuracy)} m). Walk to the next corner and capture again.`);
+      setGpsBusy(false);
+    }, (cause) => {
+      setError(cause.code === cause.PERMISSION_DENIED ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === cause.POSITION_UNAVAILABLE ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
+      setGpsBusy(false);
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  }
+
   function addVertex() {
     const last = ring[ring.length - 1] ?? [0, 0];
     setRing((current) => [...current, [last[0] + 5, last[1] + 5]]);
@@ -109,7 +140,7 @@ export default function LandStudioPage() {
     setError("");
     setBusy(true);
     try {
-      const result = await savePlot({ id: activeId, name, ring });
+      const result = await savePlot({ id: activeId, name, ring, origin: gpsOrigin, measurementMethod: captureMethod });
       setActiveId(result.plot.id);
       setName(result.plot.name);
       setRing(result.plot.ring);
@@ -177,7 +208,7 @@ export default function LandStudioPage() {
           <div className="studio-card-heading"><div><span className="studio-step">STEP 01</span><h2>Plot boundary</h2></div><button className="studio-quiet-button" onClick={startNew}>New plot</button></div>
           <label className="studio-field-label" htmlFor="plot-name">Plot name</label>
           <input className="studio-text-input" id="plot-name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} placeholder="e.g. Family land in Gudivada"/>
-          <div className="studio-draw-tools"><button className="studio-secondary-button" type="button" onClick={startDrawing}>Draw on canvas</button>{drawMode && <><span>{drawPoints.length} points placed</span><button className="studio-primary-button" type="button" onClick={finishDrawing}>Finish boundary</button><button className="studio-secondary-button" type="button" onClick={() => { setDrawMode(false); setDrawPoints([]); }}>Cancel drawing</button></>}</div>
+          <div className="studio-draw-tools"><button className="studio-secondary-button" type="button" onClick={startDrawing}>Draw on canvas</button><button className="studio-secondary-button" type="button" disabled={gpsBusy} onClick={captureGpsCorner}>{gpsBusy ? "Getting GPS…" : "Capture GPS corner"}</button>{drawMode && <><span>{drawPoints.length} points placed</span><button className="studio-primary-button" type="button" onClick={finishDrawing}>Finish boundary</button><button className="studio-secondary-button" type="button" onClick={() => { setDrawMode(false); setDrawPoints([]); }}>Cancel drawing</button></>}</div>
           <div className="studio-table-head"><span>VERTEX</span><span>X · EAST/WEST (m)</span><span>Y · NORTH/SOUTH (m)</span><span></span></div>
           <div className="studio-vertices">
             {ring.map((point, index) => <div className="studio-vertex-row" key={index}>
@@ -188,7 +219,7 @@ export default function LandStudioPage() {
             </div>)}
           </div>
           <button className="studio-add-vertex" onClick={addVertex}><Plus size={15}/> Add vertex</button>
-          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres</span></div>
+          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
           <div className="studio-actions"><button className="studio-primary-button" disabled={busy || !measurements.value} onClick={handleSave}><Save size={16}/>{busy ? "Saving…" : activeId ? "Save changes" : "Save plot"}</button><button className="studio-secondary-button" onClick={handleExport}><Download size={16}/> Export backup</button><label className="studio-secondary-button studio-import-button"><FileUp size={16}/> Import backup<input type="file" accept="application/json,.json" onChange={handleImport} disabled={busy}/></label>{activeId && <button className="studio-delete-button" disabled={busy} onClick={handleDelete}>Delete</button>}</div>
           <p className="studio-footnote">Saved to this browser using IndexedDB. Local browser storage is not cloud backup; export JSON regularly.</p>
         </section>
@@ -220,7 +251,7 @@ export default function LandStudioPage() {
               <div className="studio-metric"><span>Area (square feet)</span><strong>{formatArea(measurements.value.areaM2 * 10.7639104167)} ft²</strong></div>
               <div className="studio-metric"><span>Perimeter</span><strong>{formatArea(measurements.value.perimeterM)} m</strong></div>
               <div className="studio-metric"><span>Boundary points</span><strong>{measurements.value.vertexCount}</strong></div>
-              <p className="studio-measure-note">Planar estimate only. GPS accuracy, legal boundaries and local survey rules are not assessed by this editor.</p>
+              <p className="studio-measure-note">{captureMethod === "gps" ? "GPS-assisted local planar estimate. Accuracy varies with device, sky visibility and environment; not a legal survey." : "Planar estimate only. Legal boundaries and local survey rules are not assessed by this editor."}</p>
             </> : <div className="studio-validation-error"><strong>Boundary needs attention</strong><p>{measurements.error}</p><small>Check for crossing edges, repeated points, very narrow slivers or a closed ring.</small></div>}
           </article>
           <article className="studio-card studio-saved-plots"><div className="studio-card-heading"><div><span className="studio-step">LOCAL LIBRARY</span><h2>Saved plots</h2></div><span className="studio-count">{plots.length}</span></div>
