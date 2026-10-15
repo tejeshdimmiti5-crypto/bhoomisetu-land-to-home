@@ -21,6 +21,8 @@ export default function LandStudioPage() {
   const [error, setError] = useState("");
   const [storageStatus, setStorageStatus] = useState("Checking browser storage…");
   const [busy, setBusy] = useState(false);
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawPoints, setDrawPoints] = useState<Point2D[]>([]);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -52,6 +54,33 @@ export default function LandStudioPage() {
       next[axis] = value;
       return next;
     }));
+  }
+
+  function startDrawing() {
+    setDrawPoints([]);
+    setDrawMode(true);
+    setError("");
+    setNotice("Tap or click the canvas to place boundary corners. Place at least three points, then finish.");
+  }
+
+  function addDrawPoint(event: React.MouseEvent<SVGSVGElement>) {
+    if (!drawMode) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const xPx = (event.clientX - bounds.left) / bounds.width * 320;
+    const yPx = (event.clientY - bounds.top) / bounds.height * 220;
+    if (xPx < 30 || xPx > 290 || yPx < 30 || yPx > 190) return;
+    const point: Point2D = [Number(((xPx - 30) / 8).toFixed(3)), Number(((190 - yPx) / 8).toFixed(3))];
+    setDrawPoints((current) => [...current, point]);
+  }
+
+  function finishDrawing() {
+    if (drawPoints.length < 3) { setError("Place at least three boundary points before finishing."); return; }
+    setRing(drawPoints.map((point) => [point[0], point[1]] as Point2D));
+    setActiveId(undefined);
+    setDrawMode(false);
+    setDrawPoints([]);
+    setError("");
+    setNotice("Boundary drawn. Review the measurements and save your plot.");
   }
 
   function addVertex() {
@@ -147,6 +176,7 @@ export default function LandStudioPage() {
           <div className="studio-card-heading"><div><span className="studio-step">STEP 01</span><h2>Plot boundary</h2></div><button className="studio-quiet-button" onClick={startNew}>New plot</button></div>
           <label className="studio-field-label" htmlFor="plot-name">Plot name</label>
           <input className="studio-text-input" id="plot-name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} placeholder="e.g. Family land in Gudivada"/>
+          <div className="studio-draw-tools"><button className="studio-secondary-button" type="button" onClick={startDrawing}>Draw on canvas</button>{drawMode && <><span>{drawPoints.length} points placed</span><button className="studio-primary-button" type="button" onClick={finishDrawing}>Finish boundary</button><button className="studio-secondary-button" type="button" onClick={() => { setDrawMode(false); setDrawPoints([]); }}>Cancel drawing</button></>}</div>
           <div className="studio-table-head"><span>VERTEX</span><span>X · EAST/WEST (m)</span><span>Y · NORTH/SOUTH (m)</span><span></span></div>
           <div className="studio-vertices">
             {ring.map((point, index) => <div className="studio-vertex-row" key={index}>
@@ -165,10 +195,12 @@ export default function LandStudioPage() {
           <article className="studio-card studio-measurements">
             <span className="studio-step">LIVE MEASUREMENTS</span><h2>Your plot at a glance</h2>
             {measurements.value ? <>
-              <div className="studio-plot-preview">
-                <svg viewBox="0 0 320 220" role="img" aria-label="Scaled preview of plot boundary">
+              <div className={`studio-plot-preview ${drawMode ? "studio-draw-active" : ""}`}>
+                {drawMode && <p className="studio-draw-hint">Click/tap inside the canvas to place corners. Canvas coordinates use a local metre grid.</p>}
+                <svg viewBox="0 0 320 220" role="img" aria-label={drawMode ? "Click to place plot boundary points" : "Scaled preview of plot boundary"} onClick={addDrawPoint} style={{cursor:drawMode ? "crosshair" : "default",touchAction:drawMode ? "manipulation" : "auto"}}>
                   <defs><pattern id="studio-grid" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M 16 0 L 0 0 0 16" fill="none" stroke="#e6ece2" strokeWidth="1"/></pattern></defs>
                   <rect width="320" height="220" fill="url(#studio-grid)" rx="8"/>
+                  {drawMode && <>{drawPoints.length > 1 && <polyline points={drawPoints.map(([x,y])=>`${30+x*8},${190-y*8}`).join(" ")} fill="none" stroke="#315d48" strokeWidth="2.5" strokeDasharray="5 3" strokeLinejoin="round" />}{drawPoints.map(([x,y],i)=><g key={`draft-${i}`}><circle cx={30+x*8} cy={190-y*8} r="5" fill="#315d48" stroke="white" strokeWidth="2"/><text x={36+x*8} y={184-y*8} fontSize="10" fill="#315d48">{i+1}</text></g>)}</>}
                   <polygon points={measurements.value.ring.map(([x,y]) => {
                     const xs=measurements.value!.ring.map(p=>p[0]), ys=measurements.value!.ring.map(p=>p[1]);
                     const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
