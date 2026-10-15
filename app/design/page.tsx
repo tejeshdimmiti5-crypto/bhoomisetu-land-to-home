@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, Home, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { validateFloorPlanRooms } from "../../lib/floor-plan";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 type Plan = { version: 1; name: string; rooms: Room[]; updatedAt: string };
@@ -55,10 +56,9 @@ export default function DesignPage() {
     width: Math.max(1, ...rooms.map((room) => room.x + room.width)),
     depth: Math.max(1, ...rooms.map((room) => room.y + room.depth)),
   }), [rooms]);
-  const totalArea = rooms.reduce((sum, room) => sum + room.width * room.depth, 0);
-  const hasOverlap = rooms.some((a, i) => rooms.slice(i + 1).some((b) =>
-    a.x < b.x + b.width && a.x + a.width > b.x &&
-    a.y < b.y + b.depth && a.y + a.depth > b.y));
+  const validation = useMemo(() => validateFloorPlanRooms(rooms), [rooms]);
+  const totalArea = validation.totalRoomAreaM2;
+  const hasOverlap = validation.overlappingRoomIds.length > 0;
 
   function updateSelected(field: "name" | "x" | "y" | "width" | "depth", value: string) {
     if (!selected) return;
@@ -78,8 +78,7 @@ export default function DesignPage() {
   }
 
   function savePlan() {
-    const invalid = rooms.find((room) => !room.name.trim() || !validRoom(room));
-    if (invalid) { setNotice(`Check “${invalid.name || "unnamed room"}”: dimensions must be valid and at least 1 metre.`); return; }
+    if (!validation.valid) { setNotice(validation.errors[0] ?? "Please correct the room layout before saving."); return; }
     const plan: Plan = { version: 1, name: planName.trim() || "My home", rooms, updatedAt: new Date().toISOString() };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
@@ -132,7 +131,7 @@ export default function DesignPage() {
               <defs><pattern id="design-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e7ede4" strokeWidth="0.8"/></pattern></defs>
               <rect width="100%" height="100%" fill="url(#design-grid)"/>
               {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} style={{cursor:"pointer"}}>
-                <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
+                <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
                 <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize="12" fill="#344d39" fontWeight="600">{room.name.length > 16 ? room.name.slice(0, 15) + "…" : room.name}</text>
                 <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="10" fill="#708574">{room.width} × {room.depth} m</text>
               </g>)}
@@ -141,7 +140,7 @@ export default function DesignPage() {
           <div className="design-summary">
             <div><span>Combined room area</span><strong>{totalArea.toFixed(2)} m²</strong></div>
             <div><span>Approx. footprint bounds</span><strong>{planBounds.width.toFixed(2)} × {planBounds.depth.toFixed(2)} m</strong></div>
-            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? "Rooms overlap" : "No room overlap"}</strong></div>
+            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? `Overlap: ${validation.overlappingRoomIds.length} rooms` : "No room overlap"}</strong></div>
           </div>
           <p className="design-disclaimer">Concept layout only: this does not include wall thickness, doors, windows, structural columns, setbacks, ventilation, building codes or architect approval. Room area is summed from room rectangles and is not a certified built-up area.</p>
         </section>
