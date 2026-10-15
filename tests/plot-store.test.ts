@@ -78,6 +78,25 @@ test("import rejects unsupported coordinate metadata", async () => {
   assert.equal((await listPlots()).length, 0);
 });
 
+test("GPS capture provenance survives save, export and import", async () => {
+  const origin = { latitude: 16.4300, longitude: 81.0000 };
+  const saved = await savePlot({ name: "GPS plot", ring: rectangle, origin, measurementMethod: "gps" });
+  assert.equal(saved.plot.measurementMethod, "gps");
+  assert.deepEqual(saved.plot.origin, origin);
+  const backup = await exportPlots();
+  await deletePlot(saved.plot.id);
+  await importPlots(backup);
+  const restored = (await listPlots())[0];
+  assert.equal(restored.measurementMethod, "gps");
+  assert.deepEqual(restored.origin, origin);
+});
+
+test("import rejects invalid GPS origin metadata before writing", async () => {
+  const badOrigin = { id: "bad-gps", name: "Bad GPS", origin: { latitude: 100, longitude: 10 }, ring: rectangle };
+  await assert.rejects(importPlots(JSON.stringify({ plots: [badOrigin] })), /invalid GPS origin/);
+  assert.equal((await listPlots()).length, 0);
+});
+
 test("delete removes only the selected plot", async () => {
   const first = await savePlot({ name: "Keep", ring: rectangle });
   const second = await savePlot({ name: "Remove", ring: rectangle });
