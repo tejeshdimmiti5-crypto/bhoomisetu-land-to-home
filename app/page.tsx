@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { listPlots, type SavedPlot } from "../lib/plot-store";
 import {
   ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
   FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
@@ -25,6 +26,13 @@ export default function HomePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [toast, setToast] = useState("");
+  const [savedPlots, setSavedPlots] = useState<SavedPlot[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void listPlots().then((items) => { if (active) setSavedPlots(items); }).catch(() => { if (active) setSavedPlots([]); });
+    return () => { active = false; };
+  }, []);
 
   function createProject() {
     if (!projectName.trim()) {
@@ -125,6 +133,28 @@ export default function HomePage() {
             <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>—</strong><small>Not connected yet</small></article>
             <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Next milestone</span><strong className="stat-date">Plot setup</strong><small><Clock3 size={13} /> Demo status</small></article>
           </section>
+
+          {savedPlots.length > 0 && <section className="projects-section" aria-labelledby="saved-plots-heading">
+            <div className="section-heading">
+              <div><span className="section-kicker">SAVED IN THIS BROWSER</span><h2 id="saved-plots-heading">Your measured plots</h2><p>These records are loaded from local browser storage.</p></div>
+              <Link className="text-link" href="/studio">Manage plots <ArrowRight size={16} /></Link>
+            </div>
+            <div className="project-grid">
+              {savedPlots.map((plot) => <article className="project-card" key={plot.id}>
+                <div className="project-cover mint">
+                  <div className="cover-top"><span className="project-mark">PLOT</span><span className="project-status"><span /> Saved locally</span></div>
+                  <div className="plot-illustration"><div className="plot-outline"><div className="plot-inner"><span className="plot-pin"><MapPin size={16} /></span><span className="plot-label">MEASURED PLOT</span><span className="plot-dimensions">{plot.ring.length} points</span></div></div></div>
+                  <span className="cover-coordinate"><Ruler size={12} /> Local planar metres</span>
+                </div>
+                <div className="project-details"><div className="project-title-row"><h3>{plot.name}</h3></div>
+                  <div className="project-meta"><span><Ruler size={14} /> {new Intl.NumberFormat("en-IN",{maximumFractionDigits:3}).format(plot.areaM2)} m²</span><span>{new Intl.NumberFormat("en-IN",{maximumFractionDigits:3}).format(plot.perimeterM)} m perimeter</span></div>
+                  <div className="progress-label"><span>Record version</span><strong>{plot.recordVersion}</strong></div>
+                  <div className="progress-track"><span style={{width:"100%"}} /></div>
+                  <Link className="project-open" href="/studio">Open in Land Studio <ArrowRight size={15} /></Link>
+                </div>
+              </article>)}
+            </div>
+          </section>}
 
           <section className="projects-section" id="projects">
             <div className="section-heading">
