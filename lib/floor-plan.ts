@@ -56,8 +56,17 @@ export function validateFloorPlanRooms(input: unknown): FloorPlanValidation {
     else if (ids.has(room.id)) errors.push(`Duplicate room ID “${room.id}”.`);
     else ids.add(room.id);
     if (typeof room.name !== "string" || !room.name.trim()) errors.push(`Room ${index + 1} needs a name.`);
-    const { x, y, width, depth } = room;
-    if (![x, y, width, depth].every(isFiniteNumber)) {
+    const x = room.x;
+    const y = room.y;
+    const width = room.width;
+    const depth = room.depth;
+    // Use explicit guards so TypeScript narrows each untrusted optional field.
+    if (
+      !isFiniteNumber(x) ||
+      !isFiniteNumber(y) ||
+      !isFiniteNumber(width) ||
+      !isFiniteNumber(depth)
+    ) {
       errors.push(`Room ${index + 1} coordinates and dimensions must be finite numbers.`);
       return;
     }
