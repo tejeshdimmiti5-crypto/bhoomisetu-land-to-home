@@ -33,6 +33,8 @@ jobs:
         run: npm run test:geometry
       - name: Plot storage regression tests
         run: npm run test:plot-store
+      - name: Floor plan regression tests
+        run: npm run test:floor-plan
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
