@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Home, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileUp, Home, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { validateFloorPlanRooms } from "../../lib/floor-plan";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
@@ -107,6 +107,40 @@ export default function DesignPage() {
     setNotice("Floor-plan JSON exported. Keep the file as a backup.");
   }
 
+  async function importPlan(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 1024 * 1024) { setNotice("Plan backup must be 1 MB or smaller."); return; }
+    try {
+      const parsed = JSON.parse(await file.text()) as Partial<Plan>;
+      if (parsed.version !== 1 || !Array.isArray(parsed.rooms)) {
+        setNotice("This is not a supported BhoomiSetu floor-plan backup.");
+        return;
+      }
+      const checked = validateFloorPlanRooms(parsed.rooms);
+      if (!checked.valid) {
+        setNotice(`Backup rejected: ${checked.errors[0] ?? "room layout is invalid"}`);
+        return;
+      }
+      const nextPlan: Plan = {
+        version: 1,
+        name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim().slice(0, 100) : "Imported home",
+        rooms: parsed.rooms as Room[],
+        updatedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPlan));
+      setPlanName(nextPlan.name);
+      setRooms(nextPlan.rooms);
+      setSelectedId(nextPlan.rooms[0].id);
+      setNotice(`Imported and saved “${nextPlan.name}” in this browser.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error && cause.name === "QuotaExceededError"
+        ? "Browser storage is full. Export or remove old data before importing."
+        : "Could not import this file. Check that it is valid JSON and uses the supported plan format.");
+    }
+  }
+
   function removeRoom() {
     if (!selected || rooms.length <= 1) { setNotice("A plan must contain at least one room."); return; }
     const next = rooms.filter((room) => room.id !== selected.id);
@@ -161,7 +195,7 @@ export default function DesignPage() {
             </div>
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
-          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
+          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
           <p className="design-storage-note">Local browser storage only. Export a JSON backup before clearing browser data.</p>
         </aside>
       </div>
