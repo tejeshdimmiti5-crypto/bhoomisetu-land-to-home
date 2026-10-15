@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
+import { projectGpsToLocal } from "../../lib/gps-projection";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -96,11 +97,14 @@ export default function LandStudioPage() {
     navigator.geolocation.getCurrentPosition((position) => {
       const { latitude, longitude, accuracy } = position.coords;
       const origin = gpsOrigin ?? { latitude, longitude };
-      const radians = Math.PI / 180;
-      const earthRadiusM = 6371008.8;
-      const x = earthRadiusM * Math.cos(origin.latitude * radians) * (longitude - origin.longitude) * radians;
-      const y = earthRadiusM * (latitude - origin.latitude) * radians;
-      const nextRing: Point2D[] = gpsOrigin ? [...ring, [Number(x.toFixed(3)), Number(y.toFixed(3))]] : [[0, 0]];
+      let nextRing: Point2D[];
+      try {
+        nextRing = gpsOrigin ? [...ring, projectGpsToLocal(origin, latitude, longitude)] : [[0, 0]];
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
+        setGpsBusy(false);
+        return;
+      }
       setGpsOrigin(origin);
       setGpsAccuracy(accuracy);
       setCaptureMethod("gps");
