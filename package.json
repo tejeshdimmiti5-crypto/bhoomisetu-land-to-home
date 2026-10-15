@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test:geometry": "node scripts/run-geometry-tests.cjs",
-    "test:plot-store": "node scripts/run-plot-store-tests.cjs"
+    "test:plot-store": "node scripts/run-plot-store-tests.cjs",
+    "test:floor-plan": "node scripts/run-floor-plan-tests.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
