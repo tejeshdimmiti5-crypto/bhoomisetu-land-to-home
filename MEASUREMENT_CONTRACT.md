@@ -8,7 +8,7 @@ The current Land Studio is a manual, local-planar plot editor. It is not a GPS s
 
 - Coordinate reference: `local-planar-m`.
 - Coordinate unit: metre.
-- Origin: `null` until a future georeferencing workflow is implemented.
+- Origin: `null` for manual plots; GPS plots retain the first captured latitude/longitude as the local origin.
 - Ring convention: open ring; the first vertex must not be repeated at the end.
 - Vertex shape: exactly two finite numeric values `[x, y]`; booleans are invalid.
 - Coordinates are rounded to 1 mm using round-half-away-from-zero before validation and measurement.
@@ -19,11 +19,11 @@ The current Land Studio is a manual, local-planar plot editor. It is not a GPS s
 
 ## Saved records
 
-Each saved record has a stable ID, schema version, created/updated timestamps, record version, canonical ring, area, perimeter, coordinate contract, and measurement method. The current method is `manual`; GPS, camera/AR and hybrid capture are not yet implemented.
+Each saved record has a stable ID, schema version, created/updated timestamps, record version, canonical ring, area, perimeter, coordinate contract, and measurement method. Supported methods in this prototype are `manual` and browser GPS-assisted corner capture. GPS corners are converted to local planar metres using an equirectangular approximation around the first fix. Camera/AR and hybrid capture are not yet implemented.
 
 ## Storage and recovery
 
-Records are stored in browser IndexedDB. Browser storage can be cleared or evicted; the app requests persistent storage where available but does not guarantee it. Users should export JSON backups and keep them outside the browser. Imports validate every ring before writing and use plot IDs as upsert keys.
+Records are stored in browser IndexedDB. GPS accuracy is device- and environment-dependent. Captured points are not legal survey coordinates and should be checked against authoritative survey records. Browser storage can be cleared or evicted; the app requests persistent storage where available but does not guarantee it. Users should export JSON backups and keep them outside the browser. Imports validate every ring before writing and use plot IDs as upsert keys.
 
 ## Test policy
 
