@@ -65,6 +65,7 @@ export default function LandStudioPage() {
 
   function addDrawPoint(event: React.MouseEvent<SVGSVGElement>) {
     if (!drawMode) return;
+    if (drawPoints.length >= 200) { setError("A plot can have at most 200 vertices in this drawing tool."); return; }
     const bounds = event.currentTarget.getBoundingClientRect();
     const xPx = (event.clientX - bounds.left) / bounds.width * 320;
     const yPx = (event.clientY - bounds.top) / bounds.height * 220;
