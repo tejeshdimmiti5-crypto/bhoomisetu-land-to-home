@@ -33,6 +33,11 @@ export default function LandStudioPage() {
   }, []);
 
   useEffect(() => {
+    const requestedName = new URLSearchParams(window.location.search).get("name");
+    if (requestedName?.trim()) setName(requestedName.trim().slice(0, 100));
+  }, []);
+
+  useEffect(() => {
     void refreshPlots();
     void requestPersistentStorage().then((status) => {
       setStorageStatus(status === "granted" ? "Persistent storage granted" : status === "denied" ? "Browser may clear local data — export backups" : "Persistent storage request unsupported");
