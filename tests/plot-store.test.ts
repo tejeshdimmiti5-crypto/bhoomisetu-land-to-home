@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { deletePlot, exportPlots, importPlots, listPlots, savePlot } from "../lib/plot-store";
+import { projectGpsToLocal } from "../lib/gps-projection";
 
 const DB_NAME = "bhoomisetu-local";
 function clearDatabase(): Promise<void> {
@@ -104,4 +105,20 @@ test("delete removes only the selected plot", async () => {
   const all = await listPlots();
   assert.equal(all.length, 1);
   assert.equal(all[0].id, first.plot.id);
+});
+
+test("GPS projection returns east/north metre offsets and rounds to millimetres", () => {
+  const origin = { latitude: 0, longitude: 0 };
+  const point = projectGpsToLocal(origin, 0.001, 0.001);
+  assert.ok(point[0] > 111 && point[0] < 112);
+  assert.ok(point[1] > 111 && point[1] < 112);
+  assert.equal(point[0], Number(point[0].toFixed(3)));
+  assert.equal(point[1], Number(point[1].toFixed(3)));
+});
+
+test("GPS projection handles longitude wrap and rejects invalid coordinates", () => {
+  const point = projectGpsToLocal({ latitude: 0, longitude: 179.999 }, 0, -179.999);
+  assert.ok(point[0] > 200 && point[0] < 225);
+  assert.throws(() => projectGpsToLocal({ latitude: 91, longitude: 0 }, 0, 0), /valid ranges/);
+  assert.throws(() => projectGpsToLocal({ latitude: 0, longitude: 0 }, Number.NaN, 0), /valid ranges/);
 });
