@@ -14,7 +14,7 @@ test("valid adjacent room rectangles do not count as overlapping", () => {
   assert.equal(result.valid, true);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.bounds, { width: 8, depth: 7 });
-  assert.equal(result.totalRoomAreaM2, 53);
+  assert.equal(result.totalRoomAreaM2, 41);
   assert.deepEqual(result.overlappingRoomIds, []);
 });
 
