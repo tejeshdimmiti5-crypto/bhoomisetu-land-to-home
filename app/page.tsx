@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
   FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
@@ -58,7 +59,7 @@ export default function HomePage() {
         </nav>
         <p className="nav-label nav-label-spaced">TOOLS</p>
         <nav className="nav-list">
-          <a className="nav-item" href="#measure"><Compass size={18} /> Land measurement</a>
+          <Link className="nav-item" href="/studio"><Compass size={18} /> Land Studio</Link>
           <a className="nav-item" href="#services"><ShieldCheck size={18} /> Trusted services</a>
         </nav>
         <div className="sidebar-bottom">
@@ -97,7 +98,7 @@ export default function HomePage() {
               <p className="welcome-description">Every great home begins with a piece of land. Let’s make your next step a little simpler.</p>
               <div className="welcome-actions">
                 <button className="button-primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Start a project</button>
-                <a className="button-secondary" href="#projects">Explore workspace <ArrowRight size={17} /></a>
+                <Link className="button-secondary" href="/studio"><Ruler size={16} /> Open Land Studio <ArrowRight size={17} /></Link>
               </div>
             </div>
             <div className="hero-art" aria-label="Illustration of a home and landscape">
@@ -116,7 +117,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          <div className="demo-notice" role="note"><strong>Preview dashboard</strong><span>Sample projects and metrics are illustrative. Creating a project is not persistent yet.</span></div>
+          <div className="demo-notice" role="note"><strong>Workspace preview</strong><span>The dashboard cards still contain sample data. Use Land Studio to create, save, edit and back up real local plot records.</span></div>
           <section className="stats-grid" aria-label="Workspace summary">
             <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Demo metric</small></article>
             <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>Demo metric</small></article>
@@ -142,7 +143,7 @@ export default function HomePage() {
                     <div className="project-meta"><span><Ruler size={14} /> {project.area}</span><span className="project-status"><span /> {project.status}</span></div>
                     <div className="progress-label"><span>Project progress</span><strong>{project.progress}%</strong></div>
                     <div className="progress-track"><span style={{ width: `${project.progress}%` }} /></div>
-                    <button className="project-open" onClick={() => setToast(`${project.name}: project detail and editor are planned for the next phase.`)}>Open project <ArrowRight size={15} /></button>
+                    <Link className="project-open" href="/studio">Open Land Studio <ArrowRight size={15} /></Link>
                   </div>
                 </article>
               ))}
