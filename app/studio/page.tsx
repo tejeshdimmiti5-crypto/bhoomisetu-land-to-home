@@ -120,6 +120,7 @@ export default function LandStudioPage() {
   }
 
   function addVertex() {
+    if (ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
     const last = ring[ring.length - 1] ?? [0, 0];
     setRing((current) => [...current, [last[0] + 5, last[1] + 5]]);
   }
@@ -128,6 +129,11 @@ export default function LandStudioPage() {
     setActiveId(undefined);
     setName("New plot");
     setRing(starterRing.map((point) => [...point] as Point2D));
+    setDrawMode(false);
+    setDrawPoints([]);
+    setCaptureMethod("manual");
+    setGpsOrigin(null);
+    setGpsAccuracy(null);
     setError("");
     setNotice("New unsaved plot. Give it a name and save when ready.");
   }
@@ -136,6 +142,11 @@ export default function LandStudioPage() {
     setActiveId(plot.id);
     setName(plot.name);
     setRing(plot.ring.map((point) => [...point] as Point2D));
+    setDrawMode(false);
+    setDrawPoints([]);
+    setCaptureMethod(plot.measurementMethod);
+    setGpsOrigin(plot.origin);
+    setGpsAccuracy(null);
     setError("");
     setNotice(`Loaded “${plot.name}” · version ${plot.recordVersion}`);
   }
