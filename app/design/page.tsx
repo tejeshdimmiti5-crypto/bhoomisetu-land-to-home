@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Home, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { validateFloorPlanRooms } from "../../lib/floor-plan";
+import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
+import { listPlots, type SavedPlot } from "../../lib/plot-store";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 type Plan = { version: 1; name: string; rooms: Room[]; updatedAt: string };
@@ -29,6 +31,9 @@ export default function DesignPage() {
   const [selectedId, setSelectedId] = useState("living");
   const [notice, setNotice] = useState("Edit room dimensions and positions. Changes are saved only in this browser.");
   const [loaded, setLoaded] = useState(false);
+  const [savedPlots, setSavedPlots] = useState<SavedPlot[]>([]);
+  const [selectedPlotId, setSelectedPlotId] = useState("");
+  const [plotsLoading, setPlotsLoading] = useState(true);
 
   useEffect(() => {
     try {
@@ -51,6 +56,20 @@ export default function DesignPage() {
     setLoaded(true);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    listPlots().then((plots) => {
+      if (active) setSavedPlots(plots);
+    }).catch(() => {
+      if (active) setNotice("Saved plots could not be loaded in this browser. You can still edit a concept plan.");
+    }).finally(() => {
+      if (active) setPlotsLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const selectedPlot = savedPlots.find((plot) => plot.id === selectedPlotId);
+  const plotFit = useMemo(() => selectedPlot ? checkFloorPlanFitsPlot(selectedPlot.ring, rooms) : null, [selectedPlot, rooms]);
   const selected = rooms.find((room) => room.id === selectedId) ?? rooms[0];
   const planBounds = useMemo(() => ({
     width: Math.max(1, ...rooms.map((room) => room.x + room.width)),
@@ -182,6 +201,19 @@ export default function DesignPage() {
           <div className="design-card-head"><div><span className="design-kicker">PLAN SETTINGS</span><h2>Make it yours</h2></div><Home size={19} color="#658369"/></div>
           <label className="design-label" htmlFor="design-name">Plan name</label>
           <input id="design-name" className="design-input" maxLength={100} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="My family home"/>
+          <label className="design-label" htmlFor="design-plot">Measured plot boundary</label>
+          <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => setSelectedPlotId(event.target.value)}>
+            <option value="">No plot selected — concept mode</option>
+            {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m²</option>)}
+          </select>
+          {plotsLoading && <p className="design-storage-note">Loading saved plots from this browser…</p>}
+          {!plotsLoading && savedPlots.length === 0 && <p className="design-storage-note">No saved plots found. Save a boundary in Land Studio first.</p>}
+          {selectedPlot && plotFit && <div className="design-plot-fit" role="status">
+            <strong className={plotFit.fits ? "design-ok-text" : "design-warning-text"}>{plotFit.fits ? "Rooms fit inside plot boundary" : "Layout does not fit plot boundary"}</strong>
+            <p>Selected plot: {selectedPlot.name} · {selectedPlot.areaM2.toFixed(2)} m²</p>
+            <ul>{plotFit.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
+            <p className="design-storage-note">Geometric estimate only. Layout origin is aligned to the plot’s minimum X/Y bounds. This does not check setbacks, access, regulations, or construction safety.</p>
+          </div>}
           <div className="design-room-toolbar"><strong>Rooms</strong><button type="button" onClick={addRoom} disabled={rooms.length >= 40}><Plus size={14}/> Add room</button></div>
           <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
           {selected && <div className="design-room-fields">
