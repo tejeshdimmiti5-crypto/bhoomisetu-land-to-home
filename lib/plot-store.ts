@@ -131,11 +131,24 @@ export async function importPlots(text: string): Promise<number> {
     throw new Error("This is not a BhoomiSetu plot export.");
   }
   const incoming = parsed.plots as unknown[];
+  if (incoming.length > 10000) throw new Error("Backup contains too many plot records (maximum 10,000).");
+  const seenIds = new Set<string>();
   const validated: SavedPlot[] = incoming.map((item, index) => {
     if (!item || typeof item !== "object") throw new Error(`Plot ${index + 1} is not a valid record.`);
     const value = item as Partial<SavedPlot>;
-    if (typeof value.id !== "string" || typeof value.name !== "string") {
-      throw new Error(`Plot ${index + 1} is missing its ID or name.`);
+    if (typeof value.id !== "string" || !value.id.trim() || value.id.length > 200 || typeof value.name !== "string") {
+      throw new Error(`Plot ${index + 1} is missing a valid ID or name.`);
+    }
+    if (seenIds.has(value.id)) throw new Error(`Backup contains duplicate plot ID “${value.id}”.`);
+    seenIds.add(value.id);
+    if (value.schemaVersion !== undefined && value.schemaVersion !== PLOT_SCHEMA_VERSION) {
+      throw new Error(`Plot ${index + 1} uses an unsupported schema version.`);
+    }
+    if (value.crs !== undefined && value.crs !== "local-planar-m") {
+      throw new Error(`Plot ${index + 1} uses an unsupported coordinate reference.`);
+    }
+    if (value.coordinateUnit !== undefined && value.coordinateUnit !== "metre") {
+      throw new Error(`Plot ${index + 1} does not use metre coordinates.`);
     }
     const measured = measurePolygon(value.ring);
     const now = new Date().toISOString();
