@@ -62,7 +62,7 @@ export default function HomePage() {
         <nav className="nav-list">
           <a className="nav-item active" href="#overview"><Layers3 size={18} /> Overview</a>
           <a className="nav-item" href="#projects"><MapPin size={18} /> My plots <span className="nav-count">02</span></a>
-          <a className="nav-item" href="#design"><Home size={18} /> House designs <span className="soon-dot" /></a>
+          <Link className="nav-item" href="/design"><Home size={18} /> House designs</Link>
           <a className="nav-item" href="#budget"><Wallet size={18} /> Budget planner</a>
           <a className="nav-item" href="#documents"><FileText size={18} /> Documents</a>
         </nav>
@@ -187,7 +187,7 @@ export default function HomePage() {
             <div className="feature-grid">
               {features.map((feature) => {
                 const Icon = feature.icon;
-                return <article className="feature-card" key={feature.title}><span className={`feature-icon ${feature.tint}`}><Icon size={20} /></span><h3>{feature.title}</h3><p>{feature.detail}</p><a href="#projects" aria-label={`Explore ${feature.title}`}><MoveUpRight size={17} /></a></article>;
+                return <article className="feature-card" key={feature.title}><span className={`feature-icon ${feature.tint}`}><Icon size={20} /></span><h3>{feature.title}</h3><p>{feature.detail}</p><Link href={feature.title === "Design your home" ? "/design" : feature.title === "Measure your land" ? "/studio" : "#projects"} aria-label={`Explore ${feature.title}`}><MoveUpRight size={17} /></Link></article>;
               })}
             </div>
           </section>
