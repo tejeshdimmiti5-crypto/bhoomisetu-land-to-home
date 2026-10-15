@@ -31,6 +31,8 @@ jobs:
         run: npm run lint
       - name: Geometry tests
         run: npm run test:geometry
+      - name: Plot storage regression tests
+        run: npm run test:plot-store
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
