@@ -56,18 +56,19 @@ export function validateFloorPlanRooms(input: unknown): FloorPlanValidation {
     else if (ids.has(room.id)) errors.push(`Duplicate room ID “${room.id}”.`);
     else ids.add(room.id);
     if (typeof room.name !== "string" || !room.name.trim()) errors.push(`Room ${index + 1} needs a name.`);
-    if (![room.x, room.y, room.width, room.depth].every(isFiniteNumber)) {
+    const { x, y, width, depth } = room;
+    if (![x, y, width, depth].every(isFiniteNumber)) {
       errors.push(`Room ${index + 1} coordinates and dimensions must be finite numbers.`);
       return;
     }
-    if (room.x < 0 || room.y < 0 || room.x > MAX_POSITION_M || room.y > MAX_POSITION_M) {
+    if (x < 0 || y < 0 || x > MAX_POSITION_M || y > MAX_POSITION_M) {
       errors.push(`Room ${index + 1} position must be between 0 and ${MAX_POSITION_M} metres.`);
     }
-    if (room.width < MIN_DIMENSION_M || room.depth < MIN_DIMENSION_M ||
-        room.width > MAX_DIMENSION_M || room.depth > MAX_DIMENSION_M) {
+    if (width < MIN_DIMENSION_M || depth < MIN_DIMENSION_M ||
+        width > MAX_DIMENSION_M || depth > MAX_DIMENSION_M) {
       errors.push(`Room ${index + 1} width and depth must be between ${MIN_DIMENSION_M} and ${MAX_DIMENSION_M} metres.`);
     }
-    rooms.push(room as FloorPlanRoom);
+    rooms.push({ ...room, x, y, width, depth } as FloorPlanRoom);
   });
 
   const bounds = {
