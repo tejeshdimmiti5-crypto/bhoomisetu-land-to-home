@@ -110,7 +110,7 @@ export default function LandStudioPage() {
       setNotice(accuracy > 10 ? `GPS corner captured with ±${Math.round(accuracy)} m reported accuracy. This may be too imprecise for boundary surveying.` : `GPS corner captured (reported accuracy ±${Math.round(accuracy)} m). Walk to the next corner and capture again.`);
       setGpsBusy(false);
     }, (cause) => {
-      setError(cause.code === cause.PERMISSION_DENIED ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === cause.POSITION_UNAVAILABLE ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
+      setError(cause.code === 1 ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === 2 ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
       setGpsBusy(false);
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   }
