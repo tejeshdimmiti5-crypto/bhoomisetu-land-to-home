@@ -232,7 +232,7 @@ export default function LandStudioPage() {
                 <svg viewBox="0 0 320 220" role="img" aria-label={drawMode ? "Click to place plot boundary points" : "Scaled preview of plot boundary"} onClick={addDrawPoint} style={{cursor:drawMode ? "crosshair" : "default",touchAction:drawMode ? "manipulation" : "auto"}}>
                   <defs><pattern id="studio-grid" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M 16 0 L 0 0 0 16" fill="none" stroke="#e6ece2" strokeWidth="1"/></pattern></defs>
                   <rect width="320" height="220" fill="url(#studio-grid)" rx="8"/>
-                  {drawMode && <>{drawPoints.length > 1 && <polyline points={drawPoints.map(([x,y])=>`${30+x*8},${190-y*8}`).join(" ")} fill="none" stroke="#315d48" strokeWidth="2.5" strokeDasharray="5 3" strokeLinejoin="round" />}{drawPoints.map(([x,y],i)=><g key={`draft-${i}`}><circle cx={30+x*8} cy={190-y*8} r="5" fill="#315d48" stroke="white" strokeWidth="2"/><text x={36+x*8} y={184-y*8} fontSize="10" fill="#315d48">{i+1}</text></g>)}</>}
+                  
                   <polygon points={measurements.value.ring.map(([x,y]) => {
                     const xs=measurements.value!.ring.map(p=>p[0]), ys=measurements.value!.ring.map(p=>p[1]);
                     const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
@@ -245,6 +245,7 @@ export default function LandStudioPage() {
                     const scale=Math.min(260/Math.max(maxX-minX,0.001),160/Math.max(maxY-minY,0.001));
                     return <g key={i}><circle cx={30+(x-minX)*scale} cy={190-(y-minY)*scale} r="4" fill="#315d48" stroke="white" strokeWidth="1.5"/><text x={30+(x-minX)*scale+6} y={190-(y-minY)*scale-7} fontSize="9" fill="#355a3d">{i+1}</text></g>;
                   })}
+                {drawMode && <>{drawPoints.length > 1 && <polyline points={drawPoints.map(([x,y])=>`${30+x*8},${190-y*8}`).join(" ")} fill="none" stroke="#315d48" strokeWidth="2.5" strokeDasharray="5 3" strokeLinejoin="round" />}{drawPoints.map(([x,y],i)=><g key={`draft-${i}`}><circle cx={30+x*8} cy={190-y*8} r="5" fill="#315d48" stroke="white" strokeWidth="2"/><text x={36+x*8} y={184-y*8} fontSize="10" fill="#315d48">{i+1}</text></g>)}</>}
                 </svg>
               </div>
               <div className="studio-metric"><span>Area</span><strong>{formatArea(measurements.value.areaM2)} m²</strong></div>
