@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "contract": {
+    "crs": "local-planar-m",
+    "coordinate_unit": "metre",
+    "quantization_m": 0.001,
+    "ring_closure": "open",
+    "closed_ring_policy": "reject",
+    "minimum_edge_m": 0.001,
+    "minimum_area_m2": 0.0001,
+    "minimum_effective_width_m": 0.01
+  },
+  "cases": [
+    {
+      "id": "rectangle-10x5",
+      "input": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "expected": {
+        "areaM2": 50,
+        "perimeterM": 30,
+        "vertexCount": 4
+      }
+    },
+    {
+      "id": "triangle-3-4-5",
+      "input": [
+        [
+          0,
+          0
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "expected": {
+        "areaM2": 6,
+        "perimeterM": 12,
+        "vertexCount": 3
+      }
+    },
+    {
+      "id": "reversed-winding",
+      "input": [
+        [
+          0,
+          5
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "areaM2": 50,
+        "perimeterM": 30,
+        "vertexCount": 4
+      }
+    },
+    {
+      "id": "closed-ring-rejected",
+      "input": [
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "error": "Ring must be open"
+    },
+    {
+      "id": "three-dimensional-point-rejected",
+      "input": [
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "error": "exactly [x, y]"
+    },
+    {
+      "id": "boolean-coordinate-rejected",
+      "input": [
+        [
+          false,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "error": "finite numbers"
+    },
+    {
+      "id": "sliver-area-rejected",
+      "input": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          0.001
+        ],
+        [
+          0,
+          0.001
+        ]
+      ],
+      "error": "effective width must be at least"
+    },
+    {
+      "id": "self-intersection-rejected",
+      "input": [
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "error": "intersect or touch"
+    }
+  ]
+}

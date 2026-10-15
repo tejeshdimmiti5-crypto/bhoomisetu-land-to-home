@@ -9,22 +9,30 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
-    name: Frontend build and lint
+    name: Frontend lint and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version-file: .nvmrc
+          # npm cache is enabled once package-lock.json is committed.
       - name: Install dependencies
         run: npm install
       - name: Lint
         run: npm run lint
+      - name: Geometry tests
+        run: npm run test:geometry
+      - name: Type-check
+        run: npx tsc --noEmit
       - name: Build
         run: npm run build
-
