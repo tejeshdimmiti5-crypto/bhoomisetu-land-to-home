@@ -6,6 +6,10 @@ const STORE_NAME = "plots";
 
 export interface SavedPlot {
   schemaVersion: typeof PLOT_SCHEMA_VERSION;
+  crs: "local-planar-m";
+  coordinateUnit: "metre";
+  origin: null;
+  measurementMethod: "manual";
   id: string;
   name: string;
   ring: Point2D[];
@@ -69,6 +73,10 @@ export async function savePlot(input: {
     const previous = input.id ? await requestResult(store.get(input.id) as IDBRequest<SavedPlot | undefined>) : undefined;
     const plot: SavedPlot = {
       schemaVersion: PLOT_SCHEMA_VERSION,
+      crs: "local-planar-m",
+      coordinateUnit: "metre",
+      origin: null,
+      measurementMethod: "manual",
       id: previous?.id ?? input.id ?? crypto.randomUUID(),
       name,
       ring: measurements.ring,
@@ -133,6 +141,10 @@ export async function importPlots(text: string): Promise<number> {
     const now = new Date().toISOString();
     return {
       schemaVersion: PLOT_SCHEMA_VERSION,
+      crs: "local-planar-m",
+      coordinateUnit: "metre",
+      origin: null,
+      measurementMethod: "manual",
       id: value.id,
       name: value.name.trim() || `Imported plot ${index + 1}`,
       ring: measured.ring,
