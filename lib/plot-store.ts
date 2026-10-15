@@ -8,8 +8,8 @@ export interface SavedPlot {
   schemaVersion: typeof PLOT_SCHEMA_VERSION;
   crs: "local-planar-m";
   coordinateUnit: "metre";
-  origin: null;
-  measurementMethod: "manual";
+  origin: { latitude: number; longitude: number } | null;
+  measurementMethod: "manual" | "gps";
   id: string;
   name: string;
   ring: Point2D[];
@@ -61,6 +61,8 @@ export async function savePlot(input: {
   id?: string;
   name: string;
   ring: unknown;
+  origin?: { latitude: number; longitude: number } | null;
+  measurementMethod?: "manual" | "gps";
 }): Promise<{ plot: SavedPlot; measurements: PlotMeasurements }> {
   const name = input.name.trim();
   if (!name) throw new Error("Give this plot a name before saving.");
@@ -75,8 +77,8 @@ export async function savePlot(input: {
       schemaVersion: PLOT_SCHEMA_VERSION,
       crs: "local-planar-m",
       coordinateUnit: "metre",
-      origin: null,
-      measurementMethod: "manual",
+      origin: input.origin ?? null,
+      measurementMethod: input.measurementMethod ?? "manual",
       id: previous?.id ?? input.id ?? crypto.randomUUID(),
       name,
       ring: measurements.ring,
@@ -150,14 +152,20 @@ export async function importPlots(text: string): Promise<number> {
     if (value.coordinateUnit !== undefined && value.coordinateUnit !== "metre") {
       throw new Error(`Plot ${index + 1} does not use metre coordinates.`);
     }
+    if (value.measurementMethod !== undefined && value.measurementMethod !== "manual" && value.measurementMethod !== "gps") {
+      throw new Error(`Plot ${index + 1} uses an unsupported measurement method.`);
+    }
+    if (value.origin !== undefined && value.origin !== null && (typeof value.origin !== "object" || !Number.isFinite(value.origin.latitude) || !Number.isFinite(value.origin.longitude) || Math.abs(value.origin.latitude) > 90 || Math.abs(value.origin.longitude) > 180)) {
+      throw new Error(`Plot ${index + 1} has invalid GPS origin metadata.`);
+    }
     const measured = measurePolygon(value.ring);
     const now = new Date().toISOString();
     return {
       schemaVersion: PLOT_SCHEMA_VERSION,
       crs: "local-planar-m",
       coordinateUnit: "metre",
-      origin: null,
-      measurementMethod: "manual",
+      origin: value.origin ?? null,
+      measurementMethod: value.measurementMethod ?? "manual",
       id: value.id,
       name: value.name.trim() || `Imported plot ${index + 1}`,
       ring: measured.ring,
