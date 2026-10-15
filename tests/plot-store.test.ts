@@ -63,6 +63,21 @@ test("import validates all records before writing any records", async () => {
   assert.equal((await listPlots()).length, 0);
 });
 
+test("import rejects duplicate IDs in a single backup before writing", async () => {
+  const duplicate = { id: "same-id", name: "Repeated", ring: rectangle };
+  await assert.rejects(
+    importPlots(JSON.stringify({ plots: [duplicate, { ...duplicate, name: "Repeated copy" }] })),
+    /duplicate plot ID/,
+  );
+  assert.equal((await listPlots()).length, 0);
+});
+
+test("import rejects unsupported coordinate metadata", async () => {
+  const wrongUnits = { id: "feet-plot", name: "Feet plot", coordinateUnit: "feet", ring: rectangle };
+  await assert.rejects(importPlots(JSON.stringify({ plots: [wrongUnits] })), /does not use metre coordinates/);
+  assert.equal((await listPlots()).length, 0);
+});
+
 test("delete removes only the selected plot", async () => {
   const first = await savePlot({ name: "Keep", ring: rectangle });
   const second = await savePlot({ name: "Remove", ring: rectangle });
