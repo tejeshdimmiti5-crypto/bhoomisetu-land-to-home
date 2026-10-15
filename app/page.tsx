@@ -31,9 +31,10 @@ export default function HomePage() {
       setToast("Enter a name for your new project.");
       return;
     }
-    setToast(`“${projectName.trim()}” is ready to set up. Plot editing is the next build step.`);
+    const requestedName = projectName.trim();
     setProjectName("");
     setShowCreate(false);
+    window.location.href = `/studio?name=${encodeURIComponent(requestedName)}`;
   }
 
   return (
