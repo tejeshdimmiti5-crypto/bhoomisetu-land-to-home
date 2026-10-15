@@ -16,6 +16,7 @@ const compile = spawnSync(tsc, [
   "--strict",
   "--outDir", outputDir,
   "lib/geometry.ts",
+  "lib/gps-projection.ts",
   "lib/plot-store.ts",
   "tests/plot-store.test.ts",
 ], { stdio: "inherit" });
