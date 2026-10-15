@@ -180,9 +180,13 @@ export default function DesignPage() {
         <section className="design-card design-canvas-card">
           <div className="design-card-head"><div><span className="design-kicker">2D FLOOR PLAN</span><h2>{planName || "Untitled home"}</h2></div><span className="design-room-count">{rooms.length} rooms</span></div>
           <div className="design-canvas-wrap">
-            <svg viewBox={`0 0 ${Math.max(380, planBounds.width * 55 + 60)} ${Math.max(300, planBounds.depth * 55 + 60)}`} role="img" aria-label="Editable 2D room layout preview">
+            <svg viewBox={`0 0 ${Math.max(380, planBounds.width * 55 + 60, (plotFit?.plotBounds.width ?? 0) * 55 + 60)} ${Math.max(300, planBounds.depth * 55 + 60, (plotFit?.plotBounds.depth ?? 0) * 55 + 60)}`} role="img" aria-label="Editable 2D room layout preview">
               <defs><pattern id="design-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e7ede4" strokeWidth="0.8"/></pattern></defs>
               <rect width="100%" height="100%" fill="url(#design-grid)"/>
+              {selectedPlot && <polygon
+                points={selectedPlot.ring.map(([x, y]) => `${30 + (x - (plotFit?.plotBounds.minX ?? 0)) * 55},${30 + (y - (plotFit?.plotBounds.minY ?? 0)) * 55}`).join(" ")}
+                fill="#dce8f2" fillOpacity="0.38" stroke="#527a9c" strokeWidth="3" strokeDasharray="8 5"
+              />}
               {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} style={{cursor:"pointer"}}>
                 <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
                 <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize="12" fill="#344d39" fontWeight="600">{room.name.length > 16 ? room.name.slice(0, 15) + "…" : room.name}</text>
