@@ -7,7 +7,7 @@ import { validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
-import { generateRectangularLayoutCandidates, type LayoutCandidate } from "../../lib/layout-candidates";
+import { generatePlotLayoutCandidates, generateRectangularLayoutCandidates, type LayoutCandidate } from "../../lib/layout-candidates";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 const STORAGE_KEY = "bhoomisetu-design-document-v1";
@@ -130,11 +130,10 @@ export default function DesignPage() {
   }
 
   function generateCandidates() {
-    const generated = generateRectangularLayoutCandidates(
-      rooms.map(({ id, name, width, depth }) => ({ id, name, width, depth })),
-      candidatePlotWidth,
-      candidatePlotDepth,
-    );
+    const requirements = rooms.map(({ id, name, width, depth }) => ({ id, name, width, depth }));
+    const generated = selectedPlot
+      ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
+      : generateRectangularLayoutCandidates(requirements, candidatePlotWidth, candidatePlotDepth);
     setLayoutCandidates(generated);
     if (generated.length === 0) {
       setNotice("Could not generate candidates. Check that every room has a valid name and dimensions, and that the rectangular plot dimensions are positive.");
@@ -330,7 +329,7 @@ export default function DesignPage() {
           </div>}
           <section className="design-candidate-panel" aria-labelledby="candidate-layout-heading">
             <div className="design-room-toolbar"><strong id="candidate-layout-heading">Try layout candidates</strong><span className="design-storage-note">Experimental</span></div>
-            <p className="design-storage-note">Creates simple row-packed concepts for a rectangle. Selecting a saved plot fills its bounding-box dimensions, not its exact polygon shape. For irregular plots, these suggestions are not guaranteed to fit the boundary. Suggestions do not check access, doors, circulation, ventilation, setbacks, structure or regulations.</p>
+            <p className="design-storage-note">Creates simple row-packed concepts. When a saved plot is selected, candidates are checked against its actual polygon and use a small 0.1 m geometric inset. Without a selected plot, candidates are checked only against the entered rectangle. This is not a legal setback and does not check access, doors, circulation, ventilation, structure or regulations.</p>
             <div className="design-field-grid">
               <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
               <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
