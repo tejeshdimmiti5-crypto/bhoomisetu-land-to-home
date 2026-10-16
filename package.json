@@ -11,7 +11,8 @@
     "test:plot-store": "node scripts/run-plot-store-tests.cjs",
     "test:floor-plan": "node scripts/run-floor-plan-tests.cjs",
     "test:plot-fit": "node scripts/run-plot-fit-tests.cjs",
-    "test:design-document": "node scripts/run-design-document-tests.cjs"
+    "test:design-document": "node scripts/run-design-document-tests.cjs",
+    "test:estimate": "node scripts/run-estimate-tests.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
