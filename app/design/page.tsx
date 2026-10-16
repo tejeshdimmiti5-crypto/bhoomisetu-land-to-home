@@ -292,14 +292,26 @@ export default function DesignPage() {
             <svg viewBox={`0 0 ${Math.max(380, planBounds.width * 55 + 60, (plotFit?.plotBounds.width ?? 0) * 55 + 60)} ${Math.max(300, planBounds.depth * 55 + 60, (plotFit?.plotBounds.depth ?? 0) * 55 + 60)}`} role="img" aria-label="Editable 2D room layout preview">
               <defs><pattern id="design-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e7ede4" strokeWidth="0.8"/></pattern></defs>
               <rect width="100%" height="100%" fill="url(#design-grid)"/>
+              <g className="design-dimension-guides" fill="none" stroke="#7d9280" strokeWidth="1">
+                <line x1="30" y1="19" x2={30 + planBounds.width * 55} y2="19"/>
+                <line x1="30" y1="14" x2="30" y2="24"/>
+                <line x1={30 + planBounds.width * 55} y1="14" x2={30 + planBounds.width * 55} y2="24"/>
+                <line x1="18" y1="30" x2="18" y2={30 + planBounds.depth * 55}/>
+                <line x1="13" y1="30" x2="23" y2="30"/>
+                <line x1="13" y1={30 + planBounds.depth * 55} x2="23" y2={30 + planBounds.depth * 55}/>
+              </g>
+              <g fill="#536b58" fontSize="10" fontWeight="600">
+                <text x={30 + planBounds.width * 27.5} y="12" textAnchor="middle">{planBounds.width.toFixed(2)} m</text>
+                <text x="10" y={30 + planBounds.depth * 27.5} textAnchor="middle" transform={`rotate(-90 10 ${30 + planBounds.depth * 27.5})`}>{planBounds.depth.toFixed(2)} m</text>
+              </g>
               {selectedPlot && <polygon
                 points={selectedPlot.ring.map(([x, y]) => `${30 + (x - (plotFit?.plotBounds.minX ?? 0)) * 55},${30 + (y - (plotFit?.plotBounds.minY ?? 0)) * 55}`).join(" ")}
                 fill="#dce8f2" fillOpacity="0.38" stroke="#527a9c" strokeWidth="3" strokeDasharray="8 5"
               />}
               {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} style={{cursor:"pointer"}}>
                 <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
-                <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize="12" fill="#344d39" fontWeight="600">{room.name.length > 16 ? room.name.slice(0, 15) + "…" : room.name}</text>
-                <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="10" fill="#708574">{room.width} × {room.depth} m</text>
+                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize={room.width < 2.4 ? "9" : room.width < 3 ? "10" : "12"} fill="#344d39" fontWeight="600">{room.name.length > Math.max(7, Math.floor(room.width * 3.1)) ? room.name.slice(0, Math.max(6, Math.floor(room.width * 3.1) - 1)) + "…" : room.name}</text>}
+                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="9" fill="#708574">{room.width.toFixed(1)} × {room.depth.toFixed(1)} m</text>}
               </g>)}
             </svg>
           </div>
