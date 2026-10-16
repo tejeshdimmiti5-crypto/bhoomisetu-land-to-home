@@ -63,7 +63,7 @@ export default function HomePage() {
           <a className="nav-item active" href="#overview"><Layers3 size={18} /> Overview</a>
           <a className="nav-item" href="#projects"><MapPin size={18} /> My plots <span className="nav-count">02</span></a>
           <Link className="nav-item" href="/design"><Home size={18} /> House designs</Link>
-          <a className="nav-item" href="#budget"><Wallet size={18} /> Budget planner</a>
+          <Link className="nav-item" href="/estimate"><Wallet size={18} /> Budget planner</Link>
           <a className="nav-item" href="#documents"><FileText size={18} /> Documents</a>
         </nav>
         <p className="nav-label nav-label-spaced">TOOLS</p>
