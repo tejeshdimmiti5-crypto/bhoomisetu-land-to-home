@@ -37,6 +37,8 @@ jobs:
         run: npm run test:floor-plan
       - name: Plot fit regression tests
         run: npm run test:plot-fit
+      - name: Design document regression tests
+        run: npm run test:design-document
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
