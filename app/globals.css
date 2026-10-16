@@ -98,7 +98,7 @@
 .design-room-count{font-size:10px;font-weight:700;color:#5d7d60;background:#eef4eb;padding:7px 9px;border-radius:8px}
 .design-canvas-wrap{width:100%;max-height:590px;overflow:auto;border:1px solid #e7eee4;border-radius:9px;background:#fbfcf9}
 .design-canvas-wrap svg{display:block;width:100%;min-width:360px;max-height:590px}
-.design-canvas-wrap g:focus{outline:none}
+.design-canvas-wrap g:focus{outline:none}.design-canvas-wrap g[role="button"]:focus-visible rect{stroke:#245fbd;stroke-width:4;stroke-dasharray:5 3}.design-canvas-wrap g[role="button"]:focus-visible{outline:none}
 .design-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:13px}
 .design-summary>div{display:flex;flex-direction:column;gap:7px;padding:12px;border:1px solid #edf1e9;background:#fbfcf9;border-radius:9px;min-width:0}
 .design-summary span{font-size:9px;line-height:1.5;color:#8a968c}
