@@ -117,6 +117,18 @@ export default function DesignPage() {
     }));
   }
 
+  function selectPlot(plotId: string) {
+    setSelectedPlotId(plotId);
+    const plot = savedPlots.find((item) => item.id === plotId);
+    if (!plot) return;
+    const xs = plot.ring.map(([x]) => x);
+    const ys = plot.ring.map(([, y]) => y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const depth = Math.max(...ys) - Math.min(...ys);
+    if (Number.isFinite(width) && width > 0) setCandidatePlotWidth(Number(width.toFixed(2)));
+    if (Number.isFinite(depth) && depth > 0) setCandidatePlotDepth(Number(depth.toFixed(2)));
+  }
+
   function generateCandidates() {
     const generated = generateRectangularLayoutCandidates(
       rooms.map(({ id, name, width, depth }) => ({ id, name, width, depth })),
@@ -304,7 +316,7 @@ export default function DesignPage() {
           <label className="design-label" htmlFor="design-name">Plan name</label>
           <input id="design-name" className="design-input" maxLength={100} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="My family home"/>
           <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading} aria-label="Refresh saved plots"><RefreshCw size={14}/> {plotsLoading ? "Loading…" : "Refresh plots"}</button></div>
-          <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => setSelectedPlotId(event.target.value)}>
+          <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => selectPlot(event.target.value)}>
             <option value="">No plot selected — concept mode</option>
             {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m² · {plot.measurementMethod === "gps" ? "GPS estimate" : "Manual"}</option>)}
           </select>
@@ -318,7 +330,7 @@ export default function DesignPage() {
           </div>}
           <section className="design-candidate-panel" aria-labelledby="candidate-layout-heading">
             <div className="design-room-toolbar"><strong id="candidate-layout-heading">Try layout candidates</strong><span className="design-storage-note">Experimental</span></div>
-            <p className="design-storage-note">Creates simple row-packed concepts for a rectangle. For irregular plots, this is not a polygon-fit generator. Suggestions do not check access, doors, circulation, ventilation, setbacks, structure or regulations.</p>
+            <p className="design-storage-note">Creates simple row-packed concepts for a rectangle. Selecting a saved plot fills its bounding-box dimensions, not its exact polygon shape. For irregular plots, these suggestions are not guaranteed to fit the boundary. Suggestions do not check access, doors, circulation, ventilation, setbacks, structure or regulations.</p>
             <div className="design-field-grid">
               <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
               <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
