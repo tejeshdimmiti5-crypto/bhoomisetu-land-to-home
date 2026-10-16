@@ -133,7 +133,7 @@ export default function EstimatePage() {
       <div className="estimate-notice" role="status">{notice}</div>
       <section className="estimate-card estimate-intro">
         <div className="estimate-intro-icon"><Wallet size={22} /></div>
-        <div><h2>No guessed market prices</h2><p>BhoomiSetu calculates arithmetic only. Enter a quote or a source you have checked; the app does not fetch live rates or independently verify suppliers yet.</p></div>
+        <div><h2>No guessed market prices</h2><p>BhoomiSetu calculates arithmetic only. Choose whether a rate comes from a supplier quote or a public source you checked yourself. The app does not fetch live rates or independently verify sources or suppliers.</p></div>
       </section>
       <section className="estimate-card">
         <div className="estimate-section-head"><div><span className="estimate-kicker">01 · ESTIMATE DETAILS</span><h2>What are we planning?</h2></div></div>
@@ -152,12 +152,13 @@ export default function EstimatePage() {
               <label>Unit<input value={item.unit} maxLength={40} onChange={(e) => updateItem(item.id, "unit", e.target.value)} placeholder="bag, kg, m², day" /></label>
               <label>Quantity<input type="number" min="0.0001" step="any" value={item.quantity} onChange={(e) => updateItem(item.id, "quantity", e.target.value)} /></label>
               <label>Rate per unit (₹)<input type="number" min="0" step="any" value={item.unitRateINR} onChange={(e) => updateItem(item.id, "unitRateINR", e.target.value)} /></label>
+              <label>Rate basis<select value={item.rateOrigin} onChange={(e) => updateItem(item.id, "rateOrigin", e.target.value)}><option value="user_quote">Supplier / contractor quote</option><option value="verified_source">Public source I checked myself</option></select></label>
               <label>Source / supplier quote<input value={item.sourceLabel} maxLength={200} onChange={(e) => updateItem(item.id, "sourceLabel", e.target.value)} placeholder="Supplier, quote ID or URL/title" /></label>
               <label>Rate date<input type="date" value={item.sourceDate} onChange={(e) => updateItem(item.id, "sourceDate", e.target.value)} /></label>
               <label>Rate applies to region<input value={item.region} maxLength={200} onChange={(e) => updateItem(item.id, "region", e.target.value)} placeholder="Where the quote applies" /></label>
               <label>Wastage allowance (%)<input type="number" min="0" max="100" step="0.5" value={item.wastagePercent} onChange={(e) => updateItem(item.id, "wastagePercent", e.target.value)} /></label>
             </div>
-            <div className="estimate-line-total"><span>Calculated line total (before any taxes/transport not included)</span><strong>{formatINR(Math.max(0, Number.isFinite(item.quantity * item.unitRateINR) ? item.quantity * item.unitRateINR * (1 + item.wastagePercent / 100) : 0))}</strong></div>
+            <div className="estimate-line-total"><span>Calculated line total (before any taxes/transport not included)</span><strong>{Number.isFinite(item.quantity) && item.quantity > 0 && Number.isFinite(item.unitRateINR) && item.unitRateINR >= 0 && Number.isFinite(item.wastagePercent) && item.wastagePercent >= 0 && item.wastagePercent <= 100 ? formatINR(item.quantity * item.unitRateINR * (1 + item.wastagePercent / 100)) : "—"}</strong></div>
           </article>)}
         </div>}
       </section>
