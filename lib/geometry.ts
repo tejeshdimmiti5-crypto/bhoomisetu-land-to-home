@@ -27,6 +27,8 @@ const QUANTUM = 0.001;
 const DEFAULT_MIN_EDGE_M = 0.001;
 const DEFAULT_MIN_AREA_M2 = 0.0001;
 const DEFAULT_MIN_EFFECTIVE_WIDTH_M = 0.01;
+/** Keeps the O(n²) intersection check bounded for user-supplied/imported rings. */
+export const MAX_POLYGON_VERTICES = 500;
 const EPSILON = 1e-9;
 
 function roundHalfAwayFromZero(value: number): number {
@@ -112,6 +114,9 @@ function signedArea(ring: Ring): number {
 export function measurePolygon(input: unknown, options: GeometryOptions = {}): PlotMeasurements {
   if (!Array.isArray(input)) throw new Error("Ring must be an array of vertices.");
   if (input.length < 3) throw new Error("A polygon needs at least three vertices.");
+  if (input.length > MAX_POLYGON_VERTICES) {
+    throw new Error(`A polygon can contain at most ${MAX_POLYGON_VERTICES} vertices.`);
+  }
 
   const raw = input as unknown[];
   raw.forEach((point, index) => assertPoint(point, index));
