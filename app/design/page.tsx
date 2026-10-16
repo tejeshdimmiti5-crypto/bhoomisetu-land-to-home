@@ -6,11 +6,13 @@ import { ArrowLeft, Download, FileUp, Home, Plus, Printer, RefreshCw, RotateCcw,
 import { validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
+import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 type Plan = { version: 1; name: string; rooms: Room[]; updatedAt: string };
 
-const STORAGE_KEY = "bhoomisetu-floor-plan-v1";
+const STORAGE_KEY = "bhoomisetu-design-document-v1";
+const LEGACY_STORAGE_KEY = "bhoomisetu-floor-plan-v1";
 const starterRooms: Room[] = [
   { id: "living", name: "Living", x: 0, y: 0, width: 5, depth: 4 },
   { id: "bedroom-1", name: "Bedroom 1", x: 5, y: 0, width: 3.5, depth: 4 },
@@ -37,21 +39,37 @@ export default function DesignPage() {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Plan>;
-        if (parsed.version === 1 && Array.isArray(parsed.rooms) &&
-            parsed.rooms.length > 0 && parsed.rooms.length <= 40 &&
-            parsed.rooms.every((room) => room && typeof room.id === "string" &&
-              typeof room.name === "string" && validRoom(room as Room))) {
-          setRooms(parsed.rooms as Room[]);
-          if (typeof parsed.name === "string") setPlanName(parsed.name.slice(0, 100));
-          setSelectedId((parsed.rooms as Room[])[0].id);
-          setNotice("Restored your last local floor plan.");
+      const canonicalRaw = window.localStorage.getItem(STORAGE_KEY);
+      if (canonicalRaw) {
+        const parsed = parseHouseDesignDocument(canonicalRaw);
+        if (!parsed.valid || !parsed.document) {
+          setNotice(`Saved design was not loaded: ${parsed.errors[0] ?? "unsupported document"} Export or recover a backup before saving over it.`);
+          setLoaded(true);
+          return;
+        }
+        setRooms(parsed.document.rooms);
+        setPlanName(parsed.document.name);
+        setSelectedId(parsed.document.rooms[0].id);
+        setSelectedPlotId(parsed.document.linkedPlotId ?? "");
+        setNotice("Restored your canonical design document from this browser.");
+      } else {
+        const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacyRaw) {
+          const legacy = JSON.parse(legacyRaw) as unknown;
+          const migrated = migrateLegacyFloorPlan(legacy, { id: `design-${Date.now()}` });
+          if (!migrated.valid || !migrated.document) {
+            setNotice(`Legacy plan was not migrated: ${migrated.errors[0] ?? "invalid plan"}. Your original data was left untouched.`);
+            setLoaded(true);
+            return;
+          }
+          setRooms(migrated.document.rooms);
+          setPlanName(migrated.document.name);
+          setSelectedId(migrated.document.rooms[0].id);
+          setNotice("Loaded your older plan without changing its room geometry. Save to create the new versioned design record.");
         }
       }
     } catch {
-      setNotice("Could not restore the previous plan. You can start with the sample layout.");
+      setNotice("Could not restore the previous plan. Original browser data was left untouched.");
     }
     setLoaded(true);
   }, []);
@@ -120,12 +138,35 @@ export default function DesignPage() {
     window.print();
   }
 
+  function createDocument(): HouseDesignDocument {
+    const now = new Date().toISOString();
+    let existingId = `design-${Date.now()}`;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const existing = parseHouseDesignDocument(raw);
+        if (existing.valid && existing.document) existingId = existing.document.id;
+      }
+    } catch { /* A fresh ID is safe when no readable canonical record exists. */ }
+    return {
+      schemaVersion: 1,
+      id: existingId,
+      name: planName.trim() || "My home",
+      units: "metres",
+      coordinateSystem: "local-planar",
+      linkedPlotId: selectedPlotId || null,
+      rooms,
+      createdAt: new Date().toISOString(),
+      updatedAt: now,
+    };
+  }
+
   function savePlan() {
     if (!validation.valid) { setNotice(validation.errors[0] ?? "Please correct the room layout before saving."); return; }
-    const plan: Plan = { version: 1, name: planName.trim() || "My home", rooms, updatedAt: new Date().toISOString() };
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-      setNotice(`Saved “${plan.name}” in this browser.`);
+      const document = createDocument();
+      window.localStorage.setItem(STORAGE_KEY, serializeHouseDesignDocument(document));
+      setNotice(`Saved “${document.name}” as a versioned design document in this browser.`);
     } catch {
       setNotice("Browser storage is unavailable or full. Export a JSON backup instead.");
     }
@@ -139,15 +180,20 @@ export default function DesignPage() {
   }
 
   function exportPlan() {
-    const plan: Plan = { version: 1, name: planName.trim() || "My home", rooms, updatedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "bhoomisetu-floor-plan.json";
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setNotice("Floor-plan JSON exported. Keep the file as a backup.");
+    if (!validation.valid) { setNotice(validation.errors[0] ?? "Please correct the room layout before exporting."); return; }
+    try {
+      const json = serializeHouseDesignDocument(createDocument());
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "bhoomisetu-design-document.json";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice("Versioned design document exported. Keep the file as a backup.");
+    } catch {
+      setNotice("Could not export an invalid design document. Correct the layout and try again.");
+    }
   }
 
   async function importPlan(event: ChangeEvent<HTMLInputElement>) {
@@ -156,31 +202,33 @@ export default function DesignPage() {
     if (!file) return;
     if (file.size > 1024 * 1024) { setNotice("Plan backup must be 1 MB or smaller."); return; }
     try {
-      const parsed = JSON.parse(await file.text()) as Partial<Plan>;
-      if (parsed.version !== 1 || !Array.isArray(parsed.rooms)) {
-        setNotice("This is not a supported BhoomiSetu floor-plan backup.");
+      const raw = await file.text();
+      let parsed = parseHouseDesignDocument(raw);
+      if (!parsed.valid || !parsed.document) {
+        let legacy: unknown;
+        try { legacy = JSON.parse(raw); } catch { legacy = null; }
+        const migrated = migrateLegacyFloorPlan(legacy, { id: `design-${Date.now()}`, linkedPlotId: selectedPlotId || null });
+        if (!migrated.valid || !migrated.document) {
+          setNotice(`Backup rejected: ${parsed.errors[0] ?? migrated.errors[0] ?? "unsupported design format"}`);
+          return;
+        }
+        parsed = { valid: true, errors: [], document: migrated.document };
+      }
+      const document = parsed.document;
+      if (!document || !document.rooms.length) {
+        setNotice("Backup rejected: at least one room is required.");
         return;
       }
-      const checked = validateFloorPlanRooms(parsed.rooms);
-      if (!checked.valid) {
-        setNotice(`Backup rejected: ${checked.errors[0] ?? "room layout is invalid"}`);
-        return;
-      }
-      const nextPlan: Plan = {
-        version: 1,
-        name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim().slice(0, 100) : "Imported home",
-        rooms: parsed.rooms as Room[],
-        updatedAt: new Date().toISOString(),
-      };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPlan));
-      setPlanName(nextPlan.name);
-      setRooms(nextPlan.rooms);
-      setSelectedId(nextPlan.rooms[0].id);
-      setNotice(`Imported and saved “${nextPlan.name}” in this browser.`);
+      window.localStorage.setItem(STORAGE_KEY, serializeHouseDesignDocument(document));
+      setPlanName(document.name);
+      setRooms(document.rooms);
+      setSelectedId(document.rooms[0].id);
+      setSelectedPlotId(document.linkedPlotId ?? "");
+      setNotice(`Imported and saved “${document.name}” in this browser. Geometry was not auto-corrected.`);
     } catch (cause) {
       setNotice(cause instanceof Error && cause.name === "QuotaExceededError"
         ? "Browser storage is full. Export or remove old data before importing."
-        : "Could not import this file. Check that it is valid JSON and uses the supported plan format.");
+        : "Could not import this file. Check that it is valid JSON and uses the supported design format.");
     }
   }
 
@@ -256,7 +304,7 @@ export default function DesignPage() {
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
           <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={printPlan}><Printer size={15}/> Print / Save PDF</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
-          <p className="design-storage-note">Local browser storage only. Export a JSON backup before clearing browser data.</p>
+          <p className="design-storage-note">Versioned design saved in this browser only. Older plans remain available as a legacy backup; export JSON before clearing browser data.</p>
         </aside>
       </div>
       <footer className="design-footer"><Link href="/studio">← Back to Land Studio</Link><span>2D concept editor · Not construction-ready</span></footer>
