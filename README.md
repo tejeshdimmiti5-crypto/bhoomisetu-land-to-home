@@ -91,7 +91,7 @@ Geometry is stored in metres and areas are calculated in square metres. The vers
 
 1. Protect user data: conflict-safe imports, save/reload recovery, strict input validation, and bounded geometry work.
 2. Establish a reproducible dependency lockfile in a network-enabled environment, then switch CI to `npm ci`.
-3. Add a dedicated units module with documented conversion definitions and regression tests.
+3. Expand units tests and verify regional land-unit conventions against authoritative local records before release.
 4. Expand test coverage around storage failure, concurrency, malformed backups, and real mobile browsers.
 5. Evolve the room editor with an explicit versioned openings model and then render doors/windows from that model.
 6. Only after geometry and data contracts are stable, improve architectural constraints and connect 3D visualization to the same canonical design document.
