@@ -357,7 +357,7 @@ export default function DesignPage() {
             </div>}
           </section>
           <div className="design-room-toolbar"><strong>Rooms</strong><button type="button" onClick={addRoom} disabled={rooms.length >= 40}><Plus size={14}/> Add room</button></div>
-          <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
+          <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} aria-pressed={room.id === selectedId} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
           {selected && <div className="design-room-fields">
             <label className="design-label" htmlFor="room-name">Selected room</label>
             <input id="room-name" className="design-input" maxLength={40} value={selected.name} onChange={(event) => updateSelected("name", event.target.value)} />
