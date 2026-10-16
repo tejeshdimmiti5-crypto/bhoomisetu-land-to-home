@@ -43,6 +43,8 @@ jobs:
         run: npm run test:estimate
       - name: Layout candidate regression tests
         run: npm run test:layout-candidates
+      - name: Room openings regression tests
+        run: npm run test:room-openings
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
