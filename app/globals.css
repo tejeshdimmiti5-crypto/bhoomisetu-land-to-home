@@ -201,3 +201,39 @@
 .estimate-footer{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 2px;color:#66816a;font-size:11px;font-weight:700}
 .estimate-footer span{margin-left:auto;color:#929c94;font-size:10px;font-weight:400}
 @media(max-width:760px){.estimate-page{padding:22px 14px 34px}.estimate-header{grid-template-columns:1fr auto;gap:10px}.estimate-back{grid-column:1/-1}.estimate-header>div{grid-column:1/-1}.estimate-local-badge{grid-column:2;grid-row:2;align-self:start}.estimate-form-grid{grid-template-columns:1fr}.estimate-card{padding:16px}.estimate-section-head{align-items:flex-start}.estimate-totals{margin-left:0}.estimate-footer span{margin-left:0;width:100%}.estimate-line-total{align-items:flex-start;flex-direction:column}}
+
+
+/* Deterministic layout candidate panel */
+.design-candidate-panel {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #dfe7dc);
+  border-radius: 1rem;
+  background: var(--surface-muted, #f8faf7);
+}
+.design-candidate-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.design-candidate-option {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border, #dfe7dc);
+  border-radius: 0.75rem;
+  background: var(--surface, #fff);
+}
+.design-candidate-option p,
+.design-candidate-option ul {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.design-candidate-option ul {
+  padding-left: 1.25rem;
+}
+.design-candidate-option button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
