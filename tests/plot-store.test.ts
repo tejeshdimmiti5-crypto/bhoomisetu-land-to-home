@@ -49,8 +49,8 @@ test("invalid geometry is rejected and never persisted", async () => {
 test("export and repeated import upsert by ID instead of duplicating", async () => {
   const original = await savePlot({ name: "Backup test", ring: rectangle });
   const backup = await exportPlots();
-  assert.equal(await importPlots(backup), 1);
-  assert.equal(await importPlots(backup), 1);
+  assert.deepEqual(await importPlots(backup), { imported: 0, unchanged: 1, conflicts: [] });
+  assert.deepEqual(await importPlots(backup), { imported: 0, unchanged: 1, conflicts: [] });
   const all = await listPlots();
   assert.equal(all.length, 1);
   assert.equal(all[0].id, original.plot.id);
@@ -86,7 +86,7 @@ test("GPS capture provenance survives save, export and import", async () => {
   assert.deepEqual(saved.plot.origin, origin);
   const backup = await exportPlots();
   await deletePlot(saved.plot.id);
-  await importPlots(backup);
+  assert.deepEqual(await importPlots(backup), { imported: 1, unchanged: 0, conflicts: [] });
   const restored = (await listPlots())[0];
   assert.equal(restored.measurementMethod, "gps");
   assert.deepEqual(restored.origin, origin);
@@ -121,4 +121,31 @@ test("GPS projection handles longitude wrap and rejects invalid coordinates", ()
   assert.ok(point[0] > 200 && point[0] < 225);
   assert.throws(() => projectGpsToLocal({ latitude: 91, longitude: 0 }, 0, 0), /valid ranges/);
   assert.throws(() => projectGpsToLocal({ latitude: 0, longitude: 0 }, Number.NaN, 0), /valid ranges/);
+});
+
+test("restoring an older backup never overwrites newer local edits", async () => {
+  const original = await savePlot({ name: "Original name", ring: rectangle });
+  const backup = await exportPlots();
+  await savePlot({ id: original.plot.id, name: "Newer local edit", ring: [[0, 0], [12, 0], [12, 5], [0, 5]] });
+
+  const result = await importPlots(backup);
+  assert.equal(result.imported, 0);
+  assert.equal(result.unchanged, 0);
+  assert.deepEqual(result.conflicts, [{ id: original.plot.id, name: "Original name" }]);
+
+  const local = (await listPlots())[0];
+  assert.equal(local.name, "Newer local edit");
+  assert.equal(local.areaM2, 60);
+});
+
+test("import adds new records but reports conflicts without replacing existing records", async () => {
+  const existing = await savePlot({ name: "Keep this", ring: rectangle });
+  const newRecord = { id: "new-record", name: "New record", ring: rectangle };
+  const conflict = { id: existing.plot.id, name: "Backup version", ring: [[0, 0], [20, 0], [20, 5], [0, 5]] };
+  const result = await importPlots(JSON.stringify({ plots: [newRecord, conflict] }));
+  assert.equal(result.imported, 1);
+  assert.equal(result.conflicts.length, 1);
+  const plots = await listPlots();
+  assert.equal(plots.length, 2);
+  assert.equal(plots.find((plot) => plot.id === existing.plot.id)?.name, "Keep this");
 });
