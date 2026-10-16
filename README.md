@@ -47,7 +47,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. This command is documented setup guidance; it is not a claim that a build or browser test has already passed.
+Open http://localhost:3000. Run `npm test` to execute all seven current deterministic test suites (geometry, plot storage, floor-plan validation, plot-fit, design-document parsing, estimates, and layout candidates). Run `npm run lint`, `npx tsc --noEmit`, and `npm run build` for the static checks. These commands describe the available checks; only report them as passing when their actual run results confirm success.
 
 ## Planned technology
 
