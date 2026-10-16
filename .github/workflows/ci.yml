@@ -41,6 +41,8 @@ jobs:
         run: npm run test:design-document
       - name: Estimate engine regression tests
         run: npm run test:estimate
+      - name: Layout candidate regression tests
+        run: npm run test:layout-candidates
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
