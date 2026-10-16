@@ -13,7 +13,8 @@
     "test:plot-fit": "node scripts/run-plot-fit-tests.cjs",
     "test:design-document": "node scripts/run-design-document-tests.cjs",
     "test:estimate": "node scripts/run-estimate-tests.cjs",
-    "test:layout-candidates": "node scripts/run-layout-candidates-tests.cjs"
+    "test:layout-candidates": "node scripts/run-layout-candidates-tests.cjs",
+    "test": "npm run test:geometry && npm run test:plot-store && npm run test:floor-plan && npm run test:plot-fit && npm run test:design-document && npm run test:estimate && npm run test:layout-candidates"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
