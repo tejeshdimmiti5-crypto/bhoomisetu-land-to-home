@@ -52,7 +52,7 @@ test("allows openings on different walls at the same offset", () => {
 test("rejects unknown rooms, duplicate IDs, invalid kinds, and non-finite measurements", () => {
   const result = validateRoomOpenings(rooms, [
     opening({ id: "same", roomId: "missing" }),
-    opening({ id: "same", kind: "skylight" as "door", offsetM: Number.NaN }),
+    opening({ id: "same", kind: "skylight" as never, offsetM: Number.NaN }),
   ]);
   assert.equal(result.valid, false);
   assert.match(result.errors.join(" "), /unknown room/);
