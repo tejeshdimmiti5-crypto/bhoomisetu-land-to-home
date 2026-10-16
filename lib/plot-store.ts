@@ -144,7 +144,26 @@ export async function exportPlots(): Promise<string> {
   }, null, 2);
 }
 
-export async function importPlots(text: string): Promise<number> {
+export interface PlotImportResult {
+  imported: number;
+  unchanged: number;
+  conflicts: { id: string; name: string }[];
+}
+
+function samePlotContent(a: SavedPlot, b: SavedPlot): boolean {
+  return a.id === b.id
+    && a.name === b.name
+    && a.measurementMethod === b.measurementMethod
+    && JSON.stringify(a.origin) === JSON.stringify(b.origin)
+    && JSON.stringify(a.ring) === JSON.stringify(b.ring);
+}
+
+/**
+ * Import new records only. Existing IDs with identical content are ignored;
+ * existing IDs with different content are reported as conflicts and never overwritten.
+ * This makes restoring an old backup non-destructive by default.
+ */
+export async function importPlots(text: string): Promise<PlotImportResult> {
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { throw new Error("That file is not valid JSON."); }
   if (!parsed || typeof parsed !== "object" || !("plots" in parsed) || !Array.isArray(parsed.plots)) {
@@ -178,6 +197,12 @@ export async function importPlots(text: string): Promise<number> {
     }
     const measured = measurePolygon(value.ring);
     const now = new Date().toISOString();
+    if (value.createdAt !== undefined && (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt)))) {
+      throw new Error(`Plot ${index + 1} has an invalid createdAt timestamp.`);
+    }
+    if (value.recordVersion !== undefined && (!Number.isInteger(value.recordVersion) || value.recordVersion < 1)) {
+      throw new Error(`Plot ${index + 1} has an invalid record version.`);
+    }
     return {
       schemaVersion: PLOT_SCHEMA_VERSION,
       crs: "local-planar-m",
@@ -189,22 +214,38 @@ export async function importPlots(text: string): Promise<number> {
       ring: measured.ring,
       areaM2: measured.areaM2,
       perimeterM: measured.perimeterM,
-      createdAt: typeof value.createdAt === "string" ? value.createdAt : now,
+      createdAt: value.createdAt ?? now,
       updatedAt: now,
-      recordVersion: Number.isInteger(value.recordVersion) && (value.recordVersion ?? 0) >= 1 ? value.recordVersion! + 1 : 1,
+      recordVersion: value.recordVersion ?? 1,
     };
   });
+
   const db = await openDatabase();
   try {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    validated.forEach((plot) => store.put(plot));
+    const result: PlotImportResult = { imported: 0, unchanged: 0, conflicts: [] };
+    const existingRequest = store.getAll() as IDBRequest<SavedPlot[]>;
+    existingRequest.onsuccess = () => {
+      const existingById = new Map(existingRequest.result.map((plot) => [plot.id, plot]));
+      for (const plot of validated) {
+        const existing = existingById.get(plot.id);
+        if (!existing) {
+          store.add(plot);
+          result.imported += 1;
+        } else if (samePlotContent(existing, plot)) {
+          result.unchanged += 1;
+        } else {
+          result.conflicts.push({ id: plot.id, name: plot.name });
+        }
+      }
+    };
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error ?? new Error("Import could not be committed."));
       tx.onabort = () => reject(tx.error ?? new Error("Import was cancelled."));
     });
-    return validated.length;
+    return result;
   } finally {
     db.close();
   }
