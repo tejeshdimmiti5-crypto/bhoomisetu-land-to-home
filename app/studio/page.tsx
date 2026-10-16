@@ -202,9 +202,12 @@ export default function LandStudioPage() {
     setError("");
     setBusy(true);
     try {
-      const count = await importPlots(await file.text());
+      const result = await importPlots(await file.text());
       await refreshPlots();
-      setNotice(`Imported or updated ${count} plot record(s). Matching IDs update existing records; they are not duplicated.`);
+      const conflictNote = result.conflicts.length
+        ? ` ${result.conflicts.length} conflicting existing record(s) were left unchanged.`
+        : "";
+      setNotice(`Imported ${result.imported} new plot(s); ${result.unchanged} already matched.${conflictNote}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Import failed."); }
     finally { setBusy(false); }
   }
