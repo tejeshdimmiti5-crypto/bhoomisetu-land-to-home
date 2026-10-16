@@ -39,6 +39,8 @@ jobs:
         run: npm run test:plot-fit
       - name: Design document regression tests
         run: npm run test:design-document
+      - name: Estimate engine regression tests
+        run: npm run test:estimate
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
