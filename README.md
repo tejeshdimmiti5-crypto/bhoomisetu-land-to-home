@@ -58,7 +58,7 @@ npx tsc --noEmit
 npm run build
 ```
 
-The aggregate `npm test` command runs eight suites:
+The aggregate `npm test` command runs nine suites:
 
 1. Polygon geometry
 2. Plot storage/import/export
@@ -68,6 +68,7 @@ The aggregate `npm test` command runs eight suites:
 6. Estimate calculations
 7. Layout candidates
 8. Room-opening validation
+9. Source-backed area-unit conversions
 
 Report checks as passing only when the corresponding local or GitHub Actions run confirms success. A green CI run is necessary but does not prove real-device usability or architectural correctness.
 
@@ -84,7 +85,7 @@ Report checks as passing only when the corresponding local or GitHub Actions run
 
 ## Units
 
-Geometry is stored in metres and areas are calculated in square metres. Any conversion shown in the UI should have an explicit definition and regression tests before release. Regional units such as gunta and cent must be documented for the target region; bigha varies by region and must not be treated as one universal conversion. A dedicated versioned units module and source-backed conversion tests remain outstanding.
+Geometry is stored in metres and areas are calculated in square metres. The versioned `lib/units.ts` module currently defines square metres, square feet, square yards, international acres, cents, and guntas, with regression tests. SI factors for square feet, square yards, and international acres follow NIST Handbook 133 (2025), Appendix E; cent and gunta are defined as 1/100 and 1/40 of an international acre. The Andhra Pradesh usage cross-check uses a secondary regional reference; local land records and local practice take precedence where a convention differs. Bigha remains excluded because it varies by region.
 
 ## Current priorities
 
