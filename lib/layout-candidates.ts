@@ -1,4 +1,6 @@
 import { validateFloorPlanRooms, type FloorPlanRoom } from "./floor-plan";
+import { checkFloorPlanFitsPlot } from "./plot-fit";
+import type { Ring } from "./geometry";
 
 export interface RoomRequirement {
   id: string;
@@ -94,4 +96,46 @@ export function generateRectangularLayoutCandidates(
     if (!valid && candidateErrors.length === 0) candidateErrors.push("Not all room requirements fit within the rectangular plot.");
     return { strategy, rooms: placed, valid, errors: [...new Set(candidateErrors)], plotWidth, plotDepth };
   });
+}
+
+
+/**
+ * Generate concept layouts against a saved plot's actual polygon, not just its
+ * bounding rectangle. A small 0.1 m inset avoids treating room edges as if
+ * they may sit directly on the plot boundary; it is not a regulatory setback.
+ */
+export function generatePlotLayoutCandidates(
+  requirements: unknown,
+  ring: Ring,
+): LayoutCandidate[] {
+  if (!Array.isArray(ring) || ring.length < 3 ||
+      !ring.every((point) => Array.isArray(point) && point.length === 2 &&
+        Number.isFinite(point[0]) && Number.isFinite(point[1]))) return [];
+  const xs = ring.map(([x]) => x);
+  const ys = ring.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const width = Math.max(...xs) - minX;
+  const depth = Math.max(...ys) - minY;
+  const inset = 0.1;
+  if (width <= inset * 2 || depth <= inset * 2) return [];
+
+  return generateRectangularLayoutCandidates(requirements, width - inset * 2, depth - inset * 2)
+    .map((candidate) => {
+      const shiftedRooms = candidate.rooms.map((room) => ({
+        ...room,
+        x: room.x + inset,
+        y: room.y + inset,
+      }));
+      const fit = checkFloorPlanFitsPlot(ring, shiftedRooms);
+      const errors = [...new Set([...candidate.errors, ...fit.errors])];
+      return {
+        ...candidate,
+        rooms: shiftedRooms,
+        valid: candidate.valid && fit.fits,
+        errors: candidate.valid && fit.fits ? [] : errors,
+        plotWidth: width,
+        plotDepth: depth,
+      };
+    });
 }
