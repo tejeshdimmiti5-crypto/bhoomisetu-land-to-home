@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateRectangularLayoutCandidates } from "../lib/layout-candidates";
+import { generatePlotLayoutCandidates, generateRectangularLayoutCandidates } from "../lib/layout-candidates";
 
 const requirements = [
   { id: "living", name: "Living", width: 4, depth: 4 },
@@ -40,4 +40,22 @@ test("does not mutate caller-provided room requirements", () => {
   const original = JSON.stringify(requirements);
   generateRectangularLayoutCandidates(requirements, 7, 7);
   assert.equal(JSON.stringify(requirements), original);
+});
+
+
+test("checks candidates against the actual saved polygon and keeps a small boundary inset", () => {
+  const square = generatePlotLayoutCandidates([
+    { id: "living", name: "Living", width: 3, depth: 3 },
+    { id: "bedroom", name: "Bedroom", width: 3, depth: 3 },
+  ], [[0, 0], [10, 0], [10, 10], [0, 10]]);
+  assert.equal(square.length, 3);
+  assert.ok(square.every((candidate) => candidate.valid));
+  assert.ok(square.every((candidate) => candidate.rooms.every((room) => room.x >= 0.1 && room.y >= 0.1)));
+
+  const triangle = generatePlotLayoutCandidates([
+    { id: "room", name: "Large room", width: 7, depth: 7 },
+  ], [[0, 0], [10, 0], [0, 10]]);
+  assert.equal(triangle.length, 3);
+  assert.ok(triangle.every((candidate) => !candidate.valid));
+  assert.ok(triangle.every((candidate) => candidate.errors.some((error) => error.includes("plot boundary"))));
 });
