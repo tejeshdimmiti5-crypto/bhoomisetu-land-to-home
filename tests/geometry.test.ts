@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { measurePolygon } from "../lib/geometry";
+import { measurePolygon, MAX_POLYGON_VERTICES } from "../lib/geometry";
 
 test("measures a 10 m by 5 m rectangle from canonical coordinates", () => {
   const result = measurePolygon([[0, 0], [10, 0], [10, 5], [0, 5]]);
@@ -56,4 +56,12 @@ test("rejects collinear / zero-area polygons", () => {
 
 test("rejects too few vertices", () => {
   assert.throws(() => measurePolygon([[0, 0], [1, 0]]), /at least three/);
+});
+
+test("rejects rings above the vertex cap before quadratic intersection checks", () => {
+  const oversized = Array.from({ length: MAX_POLYGON_VERTICES + 1 }, (_, index) => {
+    const angle = (2 * Math.PI * index) / (MAX_POLYGON_VERTICES + 1);
+    return [Math.cos(angle) * 10, Math.sin(angle) * 10];
+  });
+  assert.throws(() => measurePolygon(oversized), /at most 500 vertices/);
 });
