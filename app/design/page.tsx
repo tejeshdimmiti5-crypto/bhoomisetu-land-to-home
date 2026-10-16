@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FileUp, Home, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileUp, Home, Plus, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
@@ -55,6 +55,22 @@ export default function DesignPage() {
     }
     setLoaded(true);
   }, []);
+
+  async function reloadPlots() {
+    setPlotsLoading(true);
+    try {
+      const plots = await listPlots();
+      setSavedPlots(plots);
+      setSelectedPlotId((current) => plots.some((plot) => plot.id === current) ? current : "");
+      setNotice(plots.length
+        ? `Loaded ${plots.length} saved plot${plots.length === 1 ? "" : "s"} from this browser.`
+        : "No saved plots found. Save a boundary in Land Studio first.");
+    } catch {
+      setNotice("Saved plots could not be loaded in this browser. You can still edit a concept plan.");
+    } finally {
+      setPlotsLoading(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -205,7 +221,7 @@ export default function DesignPage() {
           <div className="design-card-head"><div><span className="design-kicker">PLAN SETTINGS</span><h2>Make it yours</h2></div><Home size={19} color="#658369"/></div>
           <label className="design-label" htmlFor="design-name">Plan name</label>
           <input id="design-name" className="design-input" maxLength={100} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="My family home"/>
-          <label className="design-label" htmlFor="design-plot">Measured plot boundary</label>
+          <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading} aria-label="Refresh saved plots"><RefreshCw size={14}/> {plotsLoading ? "Loading…" : "Refresh plots"}</button></div>
           <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => setSelectedPlotId(event.target.value)}>
             <option value="">No plot selected — concept mode</option>
             {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m²</option>)}
