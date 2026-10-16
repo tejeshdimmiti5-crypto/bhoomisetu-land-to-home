@@ -9,7 +9,7 @@ export interface RoomRequirement {
   depth: number;
 }
 
-export type LayoutStrategy = "requested-order" | "wide-first" | "deep-first";
+export type LayoutStrategy = "requested-order" | "wide-first" | "deep-first" | "compact-first" | "living-first" | "wet-rooms-first";
 
 export interface LayoutCandidate {
   strategy: LayoutStrategy;
@@ -63,6 +63,15 @@ export function generateRectangularLayoutCandidates(
     { strategy: "requested-order", rooms: [...rooms] },
     { strategy: "wide-first", rooms: [...rooms].sort((a, b) => b.width - a.width || b.depth - a.depth || a.id.localeCompare(b.id)) },
     { strategy: "deep-first", rooms: [...rooms].sort((a, b) => b.depth - a.depth || b.width - a.width || a.id.localeCompare(b.id)) },
+    { strategy: "compact-first", rooms: [...rooms].sort((a, b) => a.width * a.depth - b.width * b.depth || a.id.localeCompare(b.id)) },
+    { strategy: "living-first", rooms: [...rooms].sort((a, b) => {
+      const priority = (name: string) => /living|lounge|family|dining/i.test(name) ? 0 : /kitchen/i.test(name) ? 1 : /bedroom/i.test(name) ? 2 : 3;
+      return priority(a.name) - priority(b.name) || b.width * b.depth - a.width * a.depth || a.id.localeCompare(b.id);
+    }) },
+    { strategy: "wet-rooms-first", rooms: [...rooms].sort((a, b) => {
+      const priority = (name: string) => /bath|toilet|wash|utility|laundry/i.test(name) ? 0 : /kitchen/i.test(name) ? 1 : 2;
+      return priority(a.name) - priority(b.name) || b.width * b.depth - a.width * a.depth || a.id.localeCompare(b.id);
+    }) },
   ];
 
   return orders.map(({ strategy, rooms: order }) => {
