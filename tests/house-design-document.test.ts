@@ -69,3 +69,46 @@ test("rejects invalid JSON and documents larger than the import limit", () => {
   assert.equal(parseHouseDesignDocument("{").valid, false);
   assert.equal(parseHouseDesignDocument(" ".repeat(1024 * 1024 + 1)).valid, false);
 });
+
+test("rejects empty room lists, too many rooms, and invalid room geometry", () => {
+  assert.equal(validateHouseDesignDocument({ ...validDocument, rooms: [] }).valid, false);
+  const tooMany = Array.from({ length: 41 }, (_, index) => ({
+    id: `room-${index}`, name: `Room ${index}`, x: 0, y: index, width: 2, depth: 2,
+  }));
+  assert.ok(validateHouseDesignDocument({ ...validDocument, rooms: tooMany }).errors.some((error) => error.includes("at most 40")));
+  assert.ok(validateHouseDesignDocument({
+    ...validDocument,
+    rooms: [{ ...validDocument.rooms[0], x: Number.NaN }],
+  }).errors.some((error) => error.includes("finite numbers")));
+});
+
+test("preserves creation time and linked plot when validating a canonical record", () => {
+  const result = validateHouseDesignDocument({
+    ...validDocument,
+    linkedPlotId: "plot-123",
+  });
+  assert.equal(result.valid, true);
+  assert.equal(result.document?.createdAt, now);
+  assert.equal(result.document?.linkedPlotId, "plot-123");
+});
+
+test("legacy migration can link a plot and never mutates input room geometry", () => {
+  const rooms = [{ id: "bedroom", name: "Bedroom", x: 2.5, y: 1, width: 3.2, depth: 3.4 }];
+  const legacy = { version: 1, name: "Legacy", rooms, updatedAt: now };
+  const before = JSON.stringify(legacy);
+  const result = migrateLegacyFloorPlan(legacy, { id: "migrated-2", now, linkedPlotId: "plot-abc" });
+  assert.equal(result.valid, true);
+  assert.equal(result.document?.linkedPlotId, "plot-abc");
+  assert.deepEqual(result.document?.rooms, rooms);
+  assert.equal(JSON.stringify(legacy), before);
+});
+
+test("canonical parser rejects malformed room fields without returning a partial document", () => {
+  const result = parseHouseDesignDocument(JSON.stringify({
+    ...validDocument,
+    rooms: [{ id: "bad", name: "", x: 0, y: 0, width: 0, depth: 2 }],
+  }));
+  assert.equal(result.valid, false);
+  assert.equal(result.document, null);
+  assert.ok(result.errors.length > 0);
+});
