@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FileUp, Home, Plus, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileUp, Home, Plus, Printer, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
@@ -110,6 +110,14 @@ export default function DesignPage() {
     setRooms((current) => [...current, room]);
     setSelectedId(id);
     setNotice("Room added. Adjust its position and dimensions in the editor.");
+  }
+
+  function printPlan() {
+    if (!validation.valid) {
+      setNotice(validation.errors[0] ?? "Please correct the room layout before printing.");
+      return;
+    }
+    window.print();
   }
 
   function savePlan() {
@@ -247,7 +255,7 @@ export default function DesignPage() {
             </div>
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
-          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
+          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={printPlan}><Printer size={15}/> Print / Save PDF</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
           <p className="design-storage-note">Local browser storage only. Export a JSON backup before clearing browser data.</p>
         </aside>
       </div>
