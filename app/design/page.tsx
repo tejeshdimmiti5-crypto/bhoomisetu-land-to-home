@@ -224,15 +224,15 @@ export default function DesignPage() {
           <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading} aria-label="Refresh saved plots"><RefreshCw size={14}/> {plotsLoading ? "Loading…" : "Refresh plots"}</button></div>
           <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => setSelectedPlotId(event.target.value)}>
             <option value="">No plot selected — concept mode</option>
-            {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m²</option>)}
+            {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m² · {plot.measurementMethod === "gps" ? "GPS estimate" : "Manual"}</option>)}
           </select>
           {plotsLoading && <p className="design-storage-note">Loading saved plots from this browser…</p>}
           {!plotsLoading && savedPlots.length === 0 && <p className="design-storage-note">No saved plots found. Save a boundary in Land Studio first.</p>}
           {selectedPlot && plotFit && <div className="design-plot-fit" role="status">
             <strong className={plotFit.fits ? "design-ok-text" : "design-warning-text"}>{plotFit.fits ? "Rooms fit inside plot boundary" : "Layout does not fit plot boundary"}</strong>
-            <p>Selected plot: {selectedPlot.name} · {selectedPlot.areaM2.toFixed(2)} m²</p>
+            <p>Selected plot: {selectedPlot.name} · {selectedPlot.areaM2.toFixed(2)} m² · {selectedPlot.measurementMethod === "gps" ? "GPS-based estimate" : "Manually marked boundary"}</p>
             <ul>{plotFit.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
-            <p className="design-storage-note">Geometric estimate only. Layout origin is aligned to the plot’s minimum X/Y bounds. This does not check setbacks, access, regulations, or construction safety.</p>
+            <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y bounds. This does not check setbacks, access, regulations, or construction safety.</p>
           </div>}
           <div className="design-room-toolbar"><strong>Rooms</strong><button type="button" onClick={addRoom} disabled={rooms.length >= 40}><Plus size={14}/> Add room</button></div>
           <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
