@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { listPlots, type SavedPlot } from "../lib/plot-store";
 import {
   ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
   FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
@@ -24,15 +26,23 @@ export default function HomePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [toast, setToast] = useState("");
+  const [savedPlots, setSavedPlots] = useState<SavedPlot[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void listPlots().then((items) => { if (active) setSavedPlots(items); }).catch(() => { if (active) setSavedPlots([]); });
+    return () => { active = false; };
+  }, []);
 
   function createProject() {
     if (!projectName.trim()) {
       setToast("Enter a name for your new project.");
       return;
     }
-    setToast(`“${projectName.trim()}” is ready to set up. Plot editing is the next build step.`);
+    const requestedName = projectName.trim();
     setProjectName("");
     setShowCreate(false);
+    window.location.href = `/studio?name=${encodeURIComponent(requestedName)}`;
   }
 
   return (
@@ -52,13 +62,13 @@ export default function HomePage() {
         <nav className="nav-list">
           <a className="nav-item active" href="#overview"><Layers3 size={18} /> Overview</a>
           <a className="nav-item" href="#projects"><MapPin size={18} /> My plots <span className="nav-count">02</span></a>
-          <a className="nav-item" href="#design"><Home size={18} /> House designs <span className="soon-dot" /></a>
-          <a className="nav-item" href="#budget"><Wallet size={18} /> Budget planner</a>
+          <Link className="nav-item" href="/design"><Home size={18} /> House designs</Link>
+          <Link className="nav-item" href="/estimate"><Wallet size={18} /> Budget planner</Link>
           <a className="nav-item" href="#documents"><FileText size={18} /> Documents</a>
         </nav>
         <p className="nav-label nav-label-spaced">TOOLS</p>
         <nav className="nav-list">
-          <a className="nav-item" href="#measure"><Compass size={18} /> Land measurement</a>
+          <Link className="nav-item" href="/studio"><Compass size={18} /> Land Studio</Link>
           <a className="nav-item" href="#services"><ShieldCheck size={18} /> Trusted services</a>
         </nav>
         <div className="sidebar-bottom">
@@ -97,7 +107,7 @@ export default function HomePage() {
               <p className="welcome-description">Every great home begins with a piece of land. Let’s make your next step a little simpler.</p>
               <div className="welcome-actions">
                 <button className="button-primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Start a project</button>
-                <a className="button-secondary" href="#projects">Explore workspace <ArrowRight size={17} /></a>
+                <Link className="button-secondary" href="/studio"><Ruler size={16} /> Open Land Studio <ArrowRight size={17} /></Link>
               </div>
             </div>
             <div className="hero-art" aria-label="Illustration of a home and landscape">
@@ -116,13 +126,35 @@ export default function HomePage() {
             </div>
           </section>
 
-          <div className="demo-notice" role="note"><strong>Preview dashboard</strong><span>Sample projects and metrics are illustrative. Creating a project is not persistent yet.</span></div>
+          <div className="demo-notice" role="note"><strong>Workspace preview</strong><span>The dashboard cards still contain sample data. Use Land Studio to create, save, edit and back up real local plot records.</span></div>
           <section className="stats-grid" aria-label="Workspace summary">
             <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Demo metric</small></article>
             <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>Demo metric</small></article>
             <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>—</strong><small>Not connected yet</small></article>
             <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Next milestone</span><strong className="stat-date">Plot setup</strong><small><Clock3 size={13} /> Demo status</small></article>
           </section>
+
+          {savedPlots.length > 0 && <section className="projects-section" aria-labelledby="saved-plots-heading">
+            <div className="section-heading">
+              <div><span className="section-kicker">SAVED IN THIS BROWSER</span><h2 id="saved-plots-heading">Your measured plots</h2><p>These records are loaded from local browser storage.</p></div>
+              <Link className="text-link" href="/studio">Manage plots <ArrowRight size={16} /></Link>
+            </div>
+            <div className="project-grid">
+              {savedPlots.map((plot) => <article className="project-card" key={plot.id}>
+                <div className="project-cover mint">
+                  <div className="cover-top"><span className="project-mark">PLOT</span><span className="project-status"><span /> Saved locally</span></div>
+                  <div className="plot-illustration"><div className="plot-outline"><div className="plot-inner"><span className="plot-pin"><MapPin size={16} /></span><span className="plot-label">MEASURED PLOT</span><span className="plot-dimensions">{plot.ring.length} points</span></div></div></div>
+                  <span className="cover-coordinate"><Ruler size={12} /> Local planar metres</span>
+                </div>
+                <div className="project-details"><div className="project-title-row"><h3>{plot.name}</h3></div>
+                  <div className="project-meta"><span><Ruler size={14} /> {new Intl.NumberFormat("en-IN",{maximumFractionDigits:3}).format(plot.areaM2)} m²</span><span>{new Intl.NumberFormat("en-IN",{maximumFractionDigits:3}).format(plot.perimeterM)} m perimeter</span></div>
+                  <div className="progress-label"><span>Record version</span><strong>{plot.recordVersion}</strong></div>
+                  <div className="progress-track"><span style={{width:"100%"}} /></div>
+                  <Link className="project-open" href="/studio">Open in Land Studio <ArrowRight size={15} /></Link>
+                </div>
+              </article>)}
+            </div>
+          </section>}
 
           <section className="projects-section" id="projects">
             <div className="section-heading">
@@ -142,7 +174,7 @@ export default function HomePage() {
                     <div className="project-meta"><span><Ruler size={14} /> {project.area}</span><span className="project-status"><span /> {project.status}</span></div>
                     <div className="progress-label"><span>Project progress</span><strong>{project.progress}%</strong></div>
                     <div className="progress-track"><span style={{ width: `${project.progress}%` }} /></div>
-                    <button className="project-open" onClick={() => setToast(`${project.name}: project detail and editor are planned for the next phase.`)}>Open project <ArrowRight size={15} /></button>
+                    <Link className="project-open" href="/studio">Open Land Studio <ArrowRight size={15} /></Link>
                   </div>
                 </article>
               ))}
@@ -155,7 +187,7 @@ export default function HomePage() {
             <div className="feature-grid">
               {features.map((feature) => {
                 const Icon = feature.icon;
-                return <article className="feature-card" key={feature.title}><span className={`feature-icon ${feature.tint}`}><Icon size={20} /></span><h3>{feature.title}</h3><p>{feature.detail}</p><a href="#projects" aria-label={`Explore ${feature.title}`}><MoveUpRight size={17} /></a></article>;
+                return <article className="feature-card" key={feature.title}><span className={`feature-icon ${feature.tint}`}><Icon size={20} /></span><h3>{feature.title}</h3><p>{feature.detail}</p><Link href={feature.title === "Design your home" ? "/design" : feature.title === "Measure your land" ? "/studio" : "#projects"} aria-label={`Explore ${feature.title}`}><MoveUpRight size={17} /></Link></article>;
               })}
             </div>
           </section>

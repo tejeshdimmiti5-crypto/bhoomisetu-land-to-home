@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -32,6 +31,22 @@ jobs:
         run: npm run lint
       - name: Geometry tests
         run: npm run test:geometry
+      - name: Plot storage regression tests
+        run: npm run test:plot-store
+      - name: Floor plan regression tests
+        run: npm run test:floor-plan
+      - name: Plot fit regression tests
+        run: npm run test:plot-fit
+      - name: Design document regression tests
+        run: npm run test:design-document
+      - name: Estimate engine regression tests
+        run: npm run test:estimate
+      - name: Layout candidate regression tests
+        run: npm run test:layout-candidates
+      - name: Room openings regression tests
+        run: npm run test:room-openings
+      - name: Area unit regression tests
+        run: npm run test:units
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
