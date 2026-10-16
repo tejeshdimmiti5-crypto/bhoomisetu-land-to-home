@@ -9,8 +9,6 @@ import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
-type Plan = { version: 1; name: string; rooms: Room[]; updatedAt: string };
-
 const STORAGE_KEY = "bhoomisetu-design-document-v1";
 const LEGACY_STORAGE_KEY = "bhoomisetu-floor-plan-v1";
 const starterRooms: Room[] = [
@@ -20,12 +18,6 @@ const starterRooms: Room[] = [
   { id: "bedroom-2", name: "Bedroom 2", x: 3, y: 4, width: 3.5, depth: 3 },
   { id: "bathroom", name: "Bathroom", x: 6.5, y: 4, width: 2, depth: 2 },
 ];
-
-function validRoom(room: Room) {
-  return [room.x, room.y, room.width, room.depth].every(Number.isFinite) &&
-    room.x >= 0 && room.y >= 0 && room.width >= 1 && room.depth >= 1 &&
-    room.x <= 30 && room.y <= 30 && room.width <= 15 && room.depth <= 15;
-}
 
 export default function DesignPage() {
   const [planName, setPlanName] = useState("My first home");
@@ -141,11 +133,15 @@ export default function DesignPage() {
   function createDocument(): HouseDesignDocument {
     const now = new Date().toISOString();
     let existingId = `design-${Date.now()}`;
+    let createdAt = now;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const existing = parseHouseDesignDocument(raw);
-        if (existing.valid && existing.document) existingId = existing.document.id;
+        if (existing.valid && existing.document) {
+          existingId = existing.document.id;
+          createdAt = existing.document.createdAt;
+        }
       }
     } catch { /* A fresh ID is safe when no readable canonical record exists. */ }
     return {
@@ -156,7 +152,7 @@ export default function DesignPage() {
       coordinateSystem: "local-planar",
       linkedPlotId: selectedPlotId || null,
       rooms,
-      createdAt: new Date().toISOString(),
+      createdAt,
       updatedAt: now,
     };
   }
