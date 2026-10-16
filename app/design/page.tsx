@@ -139,7 +139,7 @@ export default function DesignPage() {
       setNotice("Could not generate candidates. Check that every room has a valid name and dimensions, and that the rectangular plot dimensions are positive.");
     } else {
       const fitting = generated.filter((candidate) => candidate.valid).length;
-      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit the entered rectangle. Review each candidate before applying it.`);
+      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit ${selectedPlot ? "the saved plot boundary" : "the entered rectangle"}. Review each candidate before applying it.`);
     }
   }
 
@@ -337,8 +337,8 @@ export default function DesignPage() {
             <button type="button" className="design-export" onClick={generateCandidates}>Generate 3 candidates</button>
             {layoutCandidates.length > 0 && <div className="design-candidate-list">
               {layoutCandidates.map((candidate) => <article className="design-candidate-option" key={candidate.strategy}>
-                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : "Deeper rooms first"}</strong><span className={candidate.valid ? "design-ok-text" : "design-warning-text"}>{candidate.valid ? "Fits rectangle" : "Does not fit"}</span></div>
-                <p>{candidate.rooms.length} of {rooms.length} rooms placed · {candidatePlotWidth} × {candidatePlotDepth} m rectangle</p>
+                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : "Deeper rooms first"}</strong><span className={candidate.valid ? "design-ok-text" : "design-warning-text"}>{candidate.valid ? (selectedPlot ? "Fits plot boundary" : "Fits rectangle") : "Does not fit"}</span></div>
+                <p>{candidate.rooms.length} of {rooms.length} rooms placed · {selectedPlot ? "checked against saved plot boundary" : `${candidatePlotWidth} × ${candidatePlotDepth} m rectangle`}</p>
                 {candidate.errors.length > 0 && <ul>{candidate.errors.slice(0, 3).map((error, index) => <li key={index}>{error}</li>)}</ul>}
                 <button type="button" className="design-export" disabled={!candidate.valid} onClick={() => applyCandidate(candidate)}>Apply this candidate</button>
               </article>)}
