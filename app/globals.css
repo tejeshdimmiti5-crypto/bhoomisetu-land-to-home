@@ -114,7 +114,7 @@
 .design-room-toolbar button:disabled{opacity:.5;cursor:not-allowed}
 .design-room-list{display:flex;flex-direction:column;gap:5px;max-height:190px;overflow:auto}
 .design-room-option{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid transparent;border-radius:7px;background:#fbfcf9;text-align:left;padding:9px 10px;color:#627268}
-.design-room-option.selected{border-color:#dbe8d7;background:#eef5eb;color:#3d6044}
+.design-room-option.selected{border-color:#dbe8d7;background:#eef5eb;color:#3d6044}.design-room-option:focus-visible{outline:3px solid #245fbd;outline-offset:2px;border-color:#245fbd}
 .design-room-option span{font-size:10px;font-weight:700;overflow-wrap:anywhere}.design-room-option small{font-size:9px;white-space:nowrap;color:#89978b}
 .design-room-fields{border-top:1px solid #edf1eb;margin-top:17px;padding-top:15px}
 .design-room-fields>.design-input{margin-bottom:13px}
