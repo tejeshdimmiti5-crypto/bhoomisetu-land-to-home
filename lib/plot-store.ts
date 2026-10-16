@@ -20,6 +20,24 @@ export interface SavedPlot {
   recordVersion: number;
 }
 
+function createPlotId(): string {
+  const cryptoApi = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : undefined;
+  if (cryptoApi && typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
+
+  // randomUUID is unavailable in some non-secure LAN contexts. Prefer Web Crypto
+  // bytes when present, but keep local plot creation usable without it.
+  if (cryptoApi && typeof cryptoApi.getRandomValues === "function") {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  // IDs are local record keys, not authentication tokens.
+  return `plot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("This browser does not support IndexedDB. Export your work from a supported browser."));
@@ -79,7 +97,7 @@ export async function savePlot(input: {
       coordinateUnit: "metre",
       origin: input.origin ?? null,
       measurementMethod: input.measurementMethod ?? "manual",
-      id: previous?.id ?? input.id ?? crypto.randomUUID(),
+      id: previous?.id ?? input.id ?? createPlotId(),
       name,
       ring: measurements.ring,
       areaM2: measurements.areaM2,
