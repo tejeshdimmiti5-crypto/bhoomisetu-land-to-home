@@ -7,6 +7,7 @@ import { validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
+import { generateRectangularLayoutCandidates, type LayoutCandidate } from "../../lib/layout-candidates";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 const STORAGE_KEY = "bhoomisetu-design-document-v1";
@@ -28,6 +29,9 @@ export default function DesignPage() {
   const [savedPlots, setSavedPlots] = useState<SavedPlot[]>([]);
   const [selectedPlotId, setSelectedPlotId] = useState("");
   const [plotsLoading, setPlotsLoading] = useState(true);
+  const [candidatePlotWidth, setCandidatePlotWidth] = useState(10);
+  const [candidatePlotDepth, setCandidatePlotDepth] = useState(15);
+  const [layoutCandidates, setLayoutCandidates] = useState<LayoutCandidate[]>([]);
 
   useEffect(() => {
     try {
@@ -111,6 +115,32 @@ export default function DesignPage() {
       ...room,
       [field]: field === "name" ? value.slice(0, 40) : (value.trim() === "" ? 0 : Number(value)),
     }));
+  }
+
+  function generateCandidates() {
+    const generated = generateRectangularLayoutCandidates(
+      rooms.map(({ id, name, width, depth }) => ({ id, name, width, depth })),
+      candidatePlotWidth,
+      candidatePlotDepth,
+    );
+    setLayoutCandidates(generated);
+    if (generated.length === 0) {
+      setNotice("Could not generate candidates. Check that every room has a valid name and dimensions, and that the rectangular plot dimensions are positive.");
+    } else {
+      const fitting = generated.filter((candidate) => candidate.valid).length;
+      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit the entered rectangle. Review each candidate before applying it.`);
+    }
+  }
+
+  function applyCandidate(candidate: LayoutCandidate) {
+    if (!candidate.valid) {
+      setNotice("This candidate does not fit the entered rectangle. Choose a valid candidate or change the room/plot dimensions.");
+      return;
+    }
+    setRooms(candidate.rooms);
+    setSelectedId(candidate.rooms[0]?.id ?? "");
+    setLayoutCandidates([]);
+    setNotice(`Applied the ${candidate.strategy} concept layout. Review the room positions and plot fit, then save if you want to keep it.`);
   }
 
   function addRoom() {
@@ -286,6 +316,23 @@ export default function DesignPage() {
             <ul>{plotFit.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
             <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y bounds. This does not check setbacks, access, regulations, or construction safety.</p>
           </div>}
+          <section className="design-candidate-panel" aria-labelledby="candidate-layout-heading">
+            <div className="design-room-toolbar"><strong id="candidate-layout-heading">Try layout candidates</strong><span className="design-storage-note">Experimental</span></div>
+            <p className="design-storage-note">Creates simple row-packed concepts for a rectangle. For irregular plots, this is not a polygon-fit generator. Suggestions do not check access, doors, circulation, ventilation, setbacks, structure or regulations.</p>
+            <div className="design-field-grid">
+              <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+              <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+            </div>
+            <button type="button" className="design-export" onClick={generateCandidates}>Generate 3 candidates</button>
+            {layoutCandidates.length > 0 && <div className="design-candidate-list">
+              {layoutCandidates.map((candidate) => <article className="design-candidate-option" key={candidate.strategy}>
+                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : "Deeper rooms first"}</strong><span className={candidate.valid ? "design-ok-text" : "design-warning-text"}>{candidate.valid ? "Fits rectangle" : "Does not fit"}</span></div>
+                <p>{candidate.rooms.length} of {rooms.length} rooms placed · {candidatePlotWidth} × {candidatePlotDepth} m rectangle</p>
+                {candidate.errors.length > 0 && <ul>{candidate.errors.slice(0, 3).map((error, index) => <li key={index}>{error}</li>)}</ul>}
+                <button type="button" className="design-export" disabled={!candidate.valid} onClick={() => applyCandidate(candidate)}>Apply this candidate</button>
+              </article>)}
+            </div>}
+          </section>
           <div className="design-room-toolbar"><strong>Rooms</strong><button type="button" onClick={addRoom} disabled={rooms.length >= 40}><Plus size={14}/> Add room</button></div>
           <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
           {selected && <div className="design-room-fields">
