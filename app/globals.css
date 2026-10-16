@@ -237,3 +237,82 @@
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+
+/* Design editor alignment and candidate-card polish */
+.design-candidate-panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+}
+.design-candidate-panel > * {
+  min-width: 0;
+}
+.design-candidate-panel .design-room-toolbar {
+  margin: 0;
+  align-items: center;
+}
+.design-candidate-panel .design-storage-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.design-candidate-panel .design-field-grid {
+  align-items: end;
+}
+.design-candidate-panel .design-label {
+  line-height: 1.45;
+}
+.design-candidate-panel .design-input {
+  box-sizing: border-box;
+}
+.design-candidate-panel > .design-export {
+  justify-self: start;
+  min-width: 170px;
+}
+.design-candidate-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+.design-candidate-option {
+  box-sizing: border-box;
+  min-width: 0;
+  align-content: start;
+}
+.design-candidate-option .design-room-toolbar {
+  align-items: flex-start;
+}
+.design-candidate-option .design-room-toolbar strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.design-candidate-option .design-room-toolbar span {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.design-candidate-option p,
+.design-candidate-option li {
+  color: #748176;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.design-candidate-option button {
+  justify-self: start;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .design-candidate-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .design-candidate-panel {
+    padding: 0.85rem;
+  }
+  .design-candidate-panel .design-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .design-candidate-panel > .design-export,
+  .design-candidate-option button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
