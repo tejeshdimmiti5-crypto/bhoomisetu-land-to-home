@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projectGpsToLocal } from "../lib/gps-projection";
-import { classifyGpsAccuracy } from "../lib/gps-capture";
+import { classifyGpsAccuracy, isGpsCandidateEligible } from "../lib/gps-capture";
 
 function assertClose(actual: number, expected: number, tolerance = 0.1): void {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${expected} +/- ${tolerance}, got ${actual}`);
@@ -31,14 +31,50 @@ test("GPS projection rejects invalid coordinates", () => {
   assert.throws(() => projectGpsToLocal({ latitude: 0, longitude: 0 }, Number.NaN, 0), /finite latitude\/longitude/);
 });
 
-test("GPS accuracy policy rejects invalid and very imprecise fixes", () => {
-  assert.equal(classifyGpsAccuracy(Number.NaN), "invalid");
-  assert.equal(classifyGpsAccuracy(-1), "invalid");
-  assert.equal(classifyGpsAccuracy(50.01), "rejected");
+const accuracyCases: Array<[number, "invalid" | "acceptable" | "rejected"]> = [
+  [-1, "invalid"],
+  [0, "invalid"],
+  [-0, "invalid"],
+  [Number.NaN, "invalid"],
+  [Number.POSITIVE_INFINITY, "invalid"],
+  [Number.NEGATIVE_INFINITY, "invalid"],
+  [5, "acceptable"],
+  [10, "acceptable"],
+  [10.0001, "rejected"],
+  [15, "rejected"],
+  [49.9999, "rejected"],
+  [50, "rejected"],
+  [50.0001, "rejected"],
+];
+
+for (const [value, expected] of accuracyCases) {
+  const name = Object.is(value, -0) ? "-0" : String(value);
+  test(`classifies GPS accuracy ${name} as ${expected}`, () => {
+    assert.equal(classifyGpsAccuracy(value), expected);
+  });
+}
+
+test("every returned GPS accuracy class belongs to the allowed set", () => {
+  const allowed = new Set(["invalid", "acceptable", "rejected"]);
+  for (const value of [-1, 0, 5, 10, 50, 51, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.ok(allowed.has(classifyGpsAccuracy(value)));
+  }
 });
 
-test("GPS accuracy policy warns above 10 metres and accepts up to 10 metres", () => {
-  assert.equal(classifyGpsAccuracy(10), "acceptable");
-  assert.equal(classifyGpsAccuracy(10.01), "warning");
-  assert.equal(classifyGpsAccuracy(50), "warning");
+test("only acceptable GPS accuracy classes are eligible for a candidate", () => {
+  assert.equal(isGpsCandidateEligible("acceptable"), true);
+  assert.equal(isGpsCandidateEligible("rejected"), false);
+  assert.equal(isGpsCandidateEligible("invalid"), false);
+});
+
+test("10.0001 m is rejected and ineligible for a GPS candidate", () => {
+  const classification = classifyGpsAccuracy(10.0001);
+  assert.equal(classification, "rejected");
+  assert.equal(isGpsCandidateEligible(classification), false);
+});
+
+test("10 m is accepted and eligible for a GPS candidate", () => {
+  const classification = classifyGpsAccuracy(10);
+  assert.equal(classification, "acceptable");
+  assert.equal(isGpsCandidateEligible(classification), true);
 });
