@@ -6,27 +6,57 @@ on:
     branches: [fix/ci-baseline-2026-10]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: read
 
 jobs:
   generate-lockfile:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout helper branch
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      - name: Generate lockfile on Linux
-        run: npm install
-      - name: Verify lockfile with clean install
-        run: npm ci
-      - name: Upload generated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 3
+      - name: Generate and verify Linux lockfile
+        run: |
+          npm install
+          npm ci
+          cp package-lock.json "$RUNNER_TEMP/package-lock.json"
+      - name: Prepare Commit 2 on target branch
+        env:
+          EXPECTED_TARGET_SHA: a4c414745cd5119467d84c7b6f41e7b54c0064ec
+        run: |
+          git fetch origin fix/ci-baseline-2026-10
+          TARGET_SHA="$(git rev-parse FETCH_HEAD)"
+          if [ "$TARGET_SHA" != "$EXPECTED_TARGET_SHA" ]; then
+            echo "Target branch moved from expected baseline $EXPECTED_TARGET_SHA to $TARGET_SHA; refusing to push."
+            exit 1
+          fi
+
+          git checkout -B fix/ci-baseline-2026-10 FETCH_HEAD
+          cp "$RUNNER_TEMP/package-lock.json" package-lock.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = '.github/workflows/ci.yml';
+          let text = fs.readFileSync(path, 'utf8');
+          text = text.replace(
+            '          node-version-file: .nvmrc\n          # npm cache is enabled once package-lock.json is committed.',
+            '          node-version-file: .nvmrc\n          cache: npm'
+          );
+          text = text.replace('        run: npm install\n', '        run: npm ci\n');
+          if (!text.includes('          cache: npm') || !text.includes('        run: npm ci')) {
+            throw new Error('Expected CI workflow edits were not applied');
+          }
+          fs.writeFileSync(path, text);
+          NODE
+          git add package-lock.json .github/workflows/ci.yml
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "ci: use reproducible npm installs"
+          git push origin HEAD:fix/ci-baseline-2026-10
