@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
 import { projectGpsToLocal } from "../../lib/gps-projection";
-import { classifyGpsAccuracy } from "../../lib/gps-capture";
+import { classifyGpsAccuracy, isGpsCandidateEligible } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -136,8 +136,8 @@ export default function LandStudioPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const origin = gpsOrigin ?? { latitude, longitude };
         const accuracyClass = classifyGpsAccuracy(accuracy);
-        if (accuracyClass === "invalid" || accuracyClass === "rejected") {
-          setError(`Android returned a location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu does not accept fixes worse than 50 m for a plot corner. Turn on Android Location, grant Chrome precise location access, and retry outdoors with a clear view of the sky. Existing saved plots are unchanged.`);
+        if (!isGpsCandidateEligible(accuracyClass)) {
+          setError(`Android returned a reported location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu accepts only finite reported accuracy greater than 0 m and no worse than ±10 m; this reading cannot be used for a plot corner. Move outdoors, wait for a stable fix, check Chrome precise-location permission, and retry. Existing saved plots are unchanged.`);
           setGpsBusy(false);
           return;
         }
@@ -152,9 +152,7 @@ export default function LandStudioPage() {
         // Keep the current boundary and all saved records untouched until the user
         // explicitly reviews and confirms this pending point.
         setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
-        setNotice(accuracyClass === "warning"
-          ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. This is imprecise; review carefully and do not treat it as a survey.`
-          : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
+        setNotice(`GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it; GPS accuracy is not a legal survey.`);
         setGpsBusy(false);
       }, (cause) => {
         if (!finishRequest()) return;
@@ -188,9 +186,7 @@ export default function LandStudioPage() {
     setActiveId(undefined);
     setGpsCandidate(null);
     setError("");
-    setNotice(classifyGpsAccuracy(candidate.accuracy) === "warning"
-      ? `GPS corner added with ±${Math.round(candidate.accuracy)} m accuracy warning. Check and manually correct the coordinates.`
-      : `GPS corner added (±${Math.round(candidate.accuracy)} m reported accuracy). Check the coordinates before saving.`);
+    setNotice("GPS corner added. Verify the coordinates before saving; reported GPS accuracy is not a legal survey.");
   }
 
   function addVertex() {
