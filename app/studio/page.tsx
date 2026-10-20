@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
 import { projectGpsToLocal } from "../../lib/gps-projection";
+import { classifyGpsAccuracy } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -99,8 +100,9 @@ export default function LandStudioPage() {
     navigator.geolocation.getCurrentPosition((position) => {
       const { latitude, longitude, accuracy } = position.coords;
       const origin = gpsOrigin ?? { latitude, longitude };
-      if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 50) {
-        setError("GPS accuracy is too poor or unavailable (over 50 m). Move to a clearer outdoor location or use manual drawing.");
+      const accuracyClass = classifyGpsAccuracy(accuracy);
+      if (accuracyClass === "invalid" || accuracyClass === "rejected") {
+        setError("GPS accuracy is invalid or too poor (over 50 m). Move to a clearer outdoor location or use manual drawing.");
         setGpsBusy(false);
         return;
       }
@@ -114,7 +116,7 @@ export default function LandStudioPage() {
       }
       // Keep the existing boundary untouched until the user reviews and confirms this point.
       setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
-      setNotice(accuracy > 10
+      setNotice(accuracyClass === "warning"
         ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
         : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
       setGpsBusy(false);
@@ -139,7 +141,7 @@ export default function LandStudioPage() {
     setActiveId(undefined);
     setGpsCandidate(null);
     setError("");
-    setNotice(candidate.accuracy > 10
+    setNotice(classifyGpsAccuracy(candidate.accuracy) === "warning"
       ? `GPS corner added with ±${Math.round(candidate.accuracy)} m accuracy warning. Check and manually correct the coordinates.`
       : `GPS corner added (±${Math.round(candidate.accuracy)} m reported accuracy). Check the coordinates before saving.`);
   }
