@@ -27,6 +27,7 @@ export default function LandStudioPage() {
   const [captureMethod, setCaptureMethod] = useState<"manual" | "gps">("manual");
   const [gpsOrigin, setGpsOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
 
   const measurements = useMemo(() => {
@@ -91,32 +92,56 @@ export default function LandStudioPage() {
 
   function captureGpsCorner() {
     if (!navigator.geolocation) { setError("This browser does not support GPS location. Use manual drawing instead."); return; }
-    if (ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    if (gpsCandidate) { setError("Review or discard the pending GPS point before capturing another."); return; }
+    if (gpsOrigin && ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
     setGpsBusy(true);
     setError("");
     navigator.geolocation.getCurrentPosition((position) => {
       const { latitude, longitude, accuracy } = position.coords;
       const origin = gpsOrigin ?? { latitude, longitude };
-      let nextRing: Point2D[];
+      if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 50) {
+        setError("GPS accuracy is too poor or unavailable (over 50 m). Move to a clearer outdoor location or use manual drawing.");
+        setGpsBusy(false);
+        return;
+      }
+      let point: Point2D;
       try {
-        nextRing = gpsOrigin ? [...ring, projectGpsToLocal(origin, latitude, longitude)] : [[0, 0]];
+        point = gpsOrigin ? projectGpsToLocal(origin, latitude, longitude) : [0, 0];
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
         setGpsBusy(false);
         return;
       }
-      setGpsOrigin(origin);
-      setGpsAccuracy(accuracy);
-      setCaptureMethod("gps");
-      setDrawMode(false);
-      setRing(nextRing);
-      setActiveId(undefined);
-      setNotice(accuracy > 10 ? `GPS corner captured with ±${Math.round(accuracy)} m reported accuracy. This may be too imprecise for boundary surveying.` : `GPS corner captured (reported accuracy ±${Math.round(accuracy)} m). Walk to the next corner and capture again.`);
+      // Keep the existing boundary untouched until the user reviews and confirms this point.
+      setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
+      setNotice(accuracy > 10
+        ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
+        : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
       setGpsBusy(false);
     }, (cause) => {
       setError(cause.code === 1 ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === 2 ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
       setGpsBusy(false);
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  }
+
+  function confirmGpsCorner() {
+    if (!gpsCandidate) return;
+    const candidate = gpsCandidate;
+    if (candidate.first) {
+      setRing([candidate.point]);
+      setGpsOrigin(candidate.origin);
+    } else {
+      setRing((current) => [...current, candidate.point]);
+    }
+    setGpsAccuracy(candidate.accuracy);
+    setCaptureMethod("gps");
+    setDrawMode(false);
+    setActiveId(undefined);
+    setGpsCandidate(null);
+    setError("");
+    setNotice(candidate.accuracy > 10
+      ? `GPS corner added with ±${Math.round(candidate.accuracy)} m accuracy warning. Check and manually correct the coordinates.`
+      : `GPS corner added (±${Math.round(candidate.accuracy)} m reported accuracy). Check the coordinates before saving.`);
   }
 
   function addVertex() {
@@ -134,6 +159,7 @@ export default function LandStudioPage() {
     setCaptureMethod("manual");
     setGpsOrigin(null);
     setGpsAccuracy(null);
+    setGpsCandidate(null);
     setError("");
     setNotice("New unsaved plot. Give it a name and save when ready.");
   }
@@ -147,6 +173,7 @@ export default function LandStudioPage() {
     setCaptureMethod(plot.measurementMethod);
     setGpsOrigin(plot.origin);
     setGpsAccuracy(null);
+    setGpsCandidate(null);
     setError("");
     setNotice(`Loaded “${plot.name}” · version ${plot.recordVersion}`);
   }
@@ -226,7 +253,7 @@ export default function LandStudioPage() {
           <div className="studio-card-heading"><div><span className="studio-step">STEP 01</span><h2>Plot boundary</h2></div><button className="studio-quiet-button" onClick={startNew}>New plot</button></div>
           <label className="studio-field-label" htmlFor="plot-name">Plot name</label>
           <input className="studio-text-input" id="plot-name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} placeholder="e.g. Family land in Gudivada"/>
-          <div className="studio-draw-tools"><button className="studio-secondary-button" type="button" onClick={startDrawing}>Draw on canvas</button><button className="studio-secondary-button" type="button" disabled={gpsBusy} onClick={captureGpsCorner}>{gpsBusy ? "Getting GPS…" : "Capture GPS corner"}</button>{drawMode && <><span>{drawPoints.length} points placed</span><button className="studio-primary-button" type="button" onClick={finishDrawing}>Finish boundary</button><button className="studio-secondary-button" type="button" onClick={() => { setDrawMode(false); setDrawPoints([]); }}>Cancel drawing</button></>}</div>
+          <div className="studio-draw-tools"><button className="studio-secondary-button" type="button" onClick={startDrawing}>Draw on canvas</button><button className="studio-secondary-button" type="button" disabled={gpsBusy || !!gpsCandidate} onClick={captureGpsCorner}>{gpsBusy ? "Getting GPS…" : "Capture GPS fix"}</button>{gpsCandidate && <><span role="status">Pending point: ({gpsCandidate.point[0].toFixed(3)}, {gpsCandidate.point[1].toFixed(3)}) m · ±{Math.round(gpsCandidate.accuracy)} m</span><button className="studio-primary-button" type="button" onClick={confirmGpsCorner}>Confirm and add corner</button><button className="studio-secondary-button" type="button" onClick={() => setGpsCandidate(null)}>Discard GPS fix</button></>}{drawMode && <><span>{drawPoints.length} points placed</span><button className="studio-primary-button" type="button" onClick={finishDrawing}>Finish boundary</button><button className="studio-secondary-button" type="button" onClick={() => { setDrawMode(false); setDrawPoints([]); }}>Cancel drawing</button></>}</div>
           <div className="studio-table-head"><span>VERTEX</span><span>X · EAST/WEST (m)</span><span>Y · NORTH/SOUTH (m)</span><span></span></div>
           <div className="studio-vertices">
             {ring.map((point, index) => <div className="studio-vertex-row" key={index}>
@@ -237,7 +264,7 @@ export default function LandStudioPage() {
             </div>)}
           </div>
           <button className="studio-add-vertex" onClick={addVertex}><Plus size={15}/> Add vertex</button>
-          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
+          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setGpsCandidate(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
           <div className="studio-actions"><button className="studio-primary-button" disabled={busy || !measurements.value} onClick={handleSave}><Save size={16}/>{busy ? "Saving…" : activeId ? "Save changes" : "Save plot"}</button><button className="studio-secondary-button" onClick={handleExport}><Download size={16}/> Export backup</button><label className="studio-secondary-button studio-import-button"><FileUp size={16}/> Import backup<input type="file" accept="application/json,.json" onChange={handleImport} disabled={busy}/></label>{activeId && <button className="studio-delete-button" disabled={busy} onClick={handleDelete}>Delete</button>}</div>
           <p className="studio-footnote">Saved to this browser using IndexedDB. Local browser storage is not cloud backup; export JSON regularly.</p>
         </section>
