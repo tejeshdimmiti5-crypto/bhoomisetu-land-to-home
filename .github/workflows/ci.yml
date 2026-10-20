@@ -2,29 +2,54 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
-    name: Frontend build and lint
+    name: Frontend lint and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Geometry tests
+        run: npm run test:geometry
+      - name: Plot storage regression tests
+        run: npm run test:plot-store
+      - name: Floor plan regression tests
+        run: npm run test:floor-plan
+      - name: Plot fit regression tests
+        run: npm run test:plot-fit
+      - name: Design document regression tests
+        run: npm run test:design-document
+      - name: Estimate engine regression tests
+        run: npm run test:estimate
+      - name: Layout candidate regression tests
+        run: npm run test:layout-candidates
+      - name: Room openings regression tests
+        run: npm run test:room-openings
+      - name: Area unit regression tests
+        run: npm run test:units
+      - name: GPS capture regression tests
+        run: npm run test:gps-capture
+      - name: Type-check
+        run: npx tsc --noEmit
       - name: Build
         run: npm run build
-

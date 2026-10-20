@@ -1,119 +1,104 @@
-# BhoomiSetu — From Your Land to Your Dream Home
+# BhoomiSetu — From Land to Home
 
-BhoomiSetu is being developed in stages. The immediate goal is a reliable, mobile-friendly Land Studio. House design, costing, construction tracking, and service discovery are later phases—not part of the current scaffold.
+BhoomiSetu is a local-first planning prototype for capturing a plot, exploring a simple room layout, and calculating transparent planning estimates. This branch contains working frontend workflows and deterministic TypeScript modules; it is **not** a CAD/BIM system, legal survey tool, structural design system, or production marketplace.
 
-## Repository and prototype status
+## Current branch status
 
-- This repository currently contains the Next.js + React + TypeScript frontend scaffold and a responsive dashboard.
-- Dashboard project cards and metrics are illustrative demo content; the dashboard is not connected to persistence or an API. The create-project dialog is currently a UI demonstration and does not save a project.
-- A separate earlier prototype was reported to contain Python/JavaScript geometry logic, SQLite persistence, and 14 passing tests. Those prototype files and test results have not yet been reconciled or independently verified in this repository. Preserve that work; port its tests and behavior before replacing it.
-- No working plot editor, production persistence, authentication, maps/GPS, 2D/3D house design, costing, or marketplace is claimed as implemented here.
-- A responsive web app is the initial mobile target. This is not a published native Android/iOS application.
+The active feature branch is `feat/land-studio-local-persistence`. Review and merge changes through the open draft PR; do not treat this branch as released production software.
 
-## Decisions and contracts to establish before saving real plots
+### Implemented in this branch
 
-### Storage strategy
+- **Land Studio (`app/studio`)**: draw/edit plot boundaries, enter dimensions, validate polygon geometry, calculate area and perimeter, capture an approximate GPS-derived local frame, save plots in browser IndexedDB, list/edit/delete saved plots, and export/import JSON backups.
+- **Geometry (`lib/geometry.ts`)**: local-planar metre coordinates, millimetre quantization before measurement, open polygon rings, finite-coordinate checks, edge/area/effective-width checks, self-intersection/touch rejection, and a vertex cap before the quadratic intersection check.
+- **Plot storage (`lib/plot-store.ts`)**: versioned records, recomputed measurements on import, batch validation before writes, and non-destructive import behavior. New IDs in a backup are added; matching content is skipped; conflicting existing IDs are reported and left unchanged.
+- **House Design (`app/design`)**: editable rectangular room layouts, room selection, overlap validation, dimension guides, candidate layout strategies, linking a saved plot for a geometric fit check, and local browser persistence with JSON import/export.
+- **Design document (`lib/house-design-document.ts`)**: validated versioned design-document parsing and legacy migration.
+- **Room-opening validation (`lib/room-openings.ts`)**: validates door/window opening data against room wall lengths and detects duplicate IDs and overlaps. This is a validation foundation, **not yet a complete interactive door/window editor or wall-rendering system**.
+- **Estimate (`app/estimate`, `lib/estimate.ts`)**: deterministic arithmetic from user-entered assumptions. It does not provide independently verified live market rates.
+- **Responsive UI and accessibility**: mobile-oriented styling and keyboard/focus affordances on relevant design controls.
+- **CI**: GitHub Actions runs dependency installation from the committed lockfile, lint, deterministic regression suites including GPS capture, TypeScript type-checking, and a production build.
 
-Choose local-first versus cloud before implementing persistence. Recommended MVP: local-first project storage (for example, IndexedDB) with explicit JSON export/import and recovery guidance. Add cloud sync only with a documented conflict-resolution strategy. If cloud persistence is chosen earlier, authentication and per-user authorization must be implemented alongside it—not deferred until public launch.
+### Not implemented or not verified as production features
 
-### Measurement data contract
+- No authentication, cloud sync, multi-user collaboration, or server-side database.
+- No legal survey accuracy or proof of land ownership.
+- No full CAD/BIM engine, construction-ready plans, structural calculations, building-code approval, automated setback/code compliance, or validated 3D model generated from the 2D plan.
+- No complete doors/windows placement UI, wall thickness model, columns, plumbing/electrical plans, or architectural circulation validation.
+- No live land valuation, sourced flood-risk map, verified contractor/supplier directory, contractor certification checks, construction guarantees, or construction-progress platform.
+- No multilingual voice agent yet.
+- The dashboard contains illustrative/demo content in places. Do not interpret demo cards, sample dimensions, or generated visual concepts as verified property data or architect-approved plans.
 
-Every saved plot must include:
-- `schema_version`
-- `crs` (use `local-planar-m` for local planar metre coordinates; do not label local coordinates as GeoJSON)
-- `coordinate_unit: "metre"`
-- `origin: null` until the plot is georeferenced
-- `ring`: polygon vertices `[[x, y], ...]` in a documented order
-- `measurement_method`: for example `manual`, `traced`, `gps`, or `hybrid`
-- provenance, capture time, accuracy/uncertainty when available, and limitations
-- a record version for optimistic concurrency when concurrent edits are supported
-- deletion/audit metadata where required
+## Technical setup
 
-Round coordinates stored in the local planar model to 1 mm; calculate from the stored rounded vertices, while formatting display values separately. Keep one authoritative geometry engine (planned: backend when the API is introduced), and use shared JSON test vectors to keep any browser preview consistent. Validate invalid/self-intersecting polygons before accepting a plot.
+- Next.js, React, TypeScript, CSS, and Lucide icons.
+- Local browser persistence: IndexedDB for plots and browser local storage for design documents.
+- Geometry coordinates use a local planar frame measured in metres. GPS-derived coordinates are approximate and are not a substitute for a professional survey.
+- `package-lock.json` is committed and CI uses `npm ci` for reproducible dependency installation.
 
-### Units
+### Requirements
 
-Use explicit, documented definitions rather than an unspecified “regional” conversion. Initial target units: square metres, square feet, square yards, international acres, cents, and gunta, with the applicable regional convention shown in the UI. Verify and cite the conversion definition for the initial target region before release. Exclude bigha until a specific region and definition are selected. Include a source/version and regression test for each supported definition.
+- Node.js **20.19.0 or newer** (matches `package.json` and `.nvmrc`)
+- npm 10 or newer
 
-## Requirements
-
-- Node.js 20.9 or newer
-- npm
-
-## Run the current frontend scaffold
+### Run locally
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. This command is documented setup guidance; it is not a claim that a build or browser test has already passed.
+Open http://localhost:3000.
 
-## Planned technology
+### Quality checks
 
-- Frontend: Next.js, React, TypeScript, CSS, Lucide icons.
-- Mobile: responsive, touch-friendly web UI; PWA/offline support can follow core workflows.
-- Backend, if retained: Python + FastAPI, with SQLite for the first server-backed prototype and PostgreSQL + PostGIS only when justified by spatial/multi-user requirements.
-- Geometry: deterministic polygon calculations; a single authoritative engine and shared cross-language fixtures.
-- Mapping: MapLibre GL JS later, with appropriate projection and data/tile licensing.
-- Testing: existing prototype tests must be ported first; then Pytest, TypeScript/ESLint, and Playwright end-to-end tests in CI.
+```bash
+npm test
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-## Phase gates
+The aggregate `npm test` command runs ten suites:
 
-### Phase 0 — Reconcile and establish a green baseline
-1. Locate and preserve the earlier prototype source and its 14-test suite.
-2. Port existing geometry tests and representative fixtures into this repo before rewriting geometry.
-3. Add GitHub Actions CI immediately; require the available test suite and frontend build/lint checks to run on every pull request and push.
-4. Establish localization infrastructure before adding many screens; start with English and Telugu.
-5. Audit dependency and map-data licenses before adding dependencies.
-6. Replace the contact placeholder in the proprietary license with a public contact address, or remove the placeholder by choosing a reviewed permissions process.
+1. Polygon geometry
+2. Plot storage/import/export
+3. Floor-plan validation
+4. Plot-fit checks
+5. Design-document parsing/migration
+6. Estimate calculations
+7. Layout candidates
+8. Room-opening validation
+9. Source-backed area-unit conversions
+10. GPS projection and accuracy classification
 
-### Phase 1 — Land Studio MVP
-- Implement plot drawing/editing and touch-friendly vertex handles.
-- Provide manual numeric input as the primary measurement method.
-- Validate polygon geometry and calculate area, perimeter and side lengths.
-- Test normal and invalid shapes from this phase onward; tests are a gate for every phase, not a later cleanup task.
-- Label outputs as planning estimates, not a professional survey.
+Report checks as passing only when the corresponding local or GitHub Actions run confirms success. A green CI run is necessary but does not prove real-device usability or architectural correctness.
 
-### Phase 2 — Persistence and integrity
-- Select local-first or cloud and document the decision.
-- Implement create/read/update/delete without duplicate records, save/reload, export/import, schema migration and validation.
-- Add optimistic concurrency, soft-delete/audit handling when relevant to the chosen storage model.
-- If cloud is used, require authentication, per-user ownership checks, HTTPS and secure authorization before storing private user data.
+## Data and safety contracts
 
-### Phase 3 — Reliability and release readiness
-- Keep unit, API and browser end-to-end tests running continuously from Phase 0/1.
-- Test polygon edge cases, conversion references, edit/reload/delete, malformed data, storage failures and mobile workflows.
-- Test at 320px, 360px, 390px and 430px plus tablet/desktop; no horizontal overflow or clipped controls.
-- Add JSON export and a tested restore/recovery procedure.
-- Do not call a release ready until relevant CI checks pass and known data-loss issues are fixed.
+- Plot rings are open arrays of `[x, y]` vertices in local planar metres; the first vertex must not be repeated at the end.
+- Geometry is quantized to 1 mm before validation and measurement. Rings above 500 vertices are rejected to bound the current O(n²) intersection algorithm.
+- Imported geometry is re-measured; stored area/perimeter are not trusted as authoritative.
+- Import is non-destructive by default: it adds new IDs, skips identical existing content, and reports conflicts without overwriting the local record. Back up important data before testing restore workflows.
+- Browser storage can be cleared or evicted. Export JSON backups and keep a copy outside the browser.
+- Plot fit is a geometric containment check only. It does not validate legal setbacks, road access, local floor-area ratio, structural safety, ventilation, or building regulations.
+- Cost estimates depend on user-provided assumptions; rate sources, dates, location and exclusions must be verified before using them as budgets.
+- Land values, flood risk, contractor credentials, warranties and guarantees must never be represented as verified until reliable sources, verification procedures and dates are integrated.
 
-## Mobile acceptance criteria
+## Units
 
-- Test narrow screens (320px, 360px, 390px, and 430px) and tablet/desktop widths.
-- No horizontal page overflow or clipped controls.
-- Navigation, dialogs, forms, and plot editing must work with touch as well as mouse/keyboard.
-- Keep important buttons and corner handles easy to tap; do not rely on hover-only interactions.
-- Check portrait and landscape layouts, readable labels, safe scrolling, and on-screen keyboard behaviour.
-- Run save/edit/reload/delete flows at desktop and mobile viewports.
-- Include at least one low-end Android/real-device check under a throttled mobile network before public release.
+Geometry is stored in metres and areas are calculated in square metres. The versioned `lib/units.ts` module currently defines square metres, square feet, square yards, international acres, cents, and guntas, with regression tests. SI factors for square feet, square yards, and international acres follow NIST Handbook 133 (2025), Appendix E; cent and gunta are defined as 1/100 and 1/40 of an international acre. The Andhra Pradesh usage cross-check uses a secondary regional reference; local land records and local practice take precedence where a convention differs. Bigha remains excluded because it varies by region.
 
-## Future phases (only after Phase 0–3 gates pass)
+## Current priorities
 
-1. Editable 2D house plans, then 3D visualization and authority-specific rule configurations.
-2. Construction cost estimates showing source, location, rate date, assumptions and exclusions; start with one city.
-3. Construction records and a carefully reviewed service-provider directory.
-4. One-state land-data integration after manual entry and document upload are handled reliably; choose a target state and official data source before implementing.
-5. GPS/map capture only with suitable projection, multiple readings, displayed accuracy/uncertainty, manual correction and clear “approximate” labelling.
-6. Voice/document assistant only after choosing providers, language performance expectations, privacy consent and an operating cost ceiling.
+1. Protect user data: conflict-safe imports, save/reload recovery, strict input validation, and bounded geometry work.
+2. Test GPS capture on real mobile devices and record practical accuracy/permission behavior; automated tests do not validate field accuracy.
+3. Expand storage tests around quota errors, concurrency, malformed backups, and real mobile browsers.
+4. Verify regional land-unit conventions against authoritative local records before release.
+5. Evolve the room editor with an explicit versioned openings model and then render doors/windows from that model.
+6. Improve architectural constraints and connect any future 3D visualization to the same canonical design document.
 
-## Product, safety and market limits
+## Product limitations
 
-- Land measurement is a planning aid, not an authorized survey, title opinion, legal advice, or proof of ownership.
-- Valuation, flood-risk layers, local rules and credentials must show trustworthy source, applicable region, verification method and effective/as-of date. Until a source is wired and dated, these features are planned only.
-- Do not upload private land deeds or identity documents to an LLM without explicit informed consent and a documented privacy policy.
-- For real user documents, plan private storage, encryption, per-user isolation, limited-duration access links, export/delete controls and tested backups.
-- Do not hold construction funds or promise a house guarantee without qualified legal and regulatory review and appropriately authorized partners.
-- Before expanding beyond the Land Studio, interview 10–20 intended users and decide whether the product solves a real problem for a clearly defined initial buyer.
-- Review naming/trademark availability before investing in public brand promotion; this README does not establish that the name is available.
+BhoomiSetu currently supports **planning and visualization only**. Plot measurements are not an authorized survey, and design fit checks are not evidence of code compliance or structural safety. Before construction, users must have a qualified local architect/engineer verify dimensions, setbacks, ventilation, access, structure, services and applicable approvals.
 
+Features such as valuations, flood-risk layers, service-provider verification, construction guarantees, cloud sync and AI/voice assistance require trustworthy data sources, clear privacy/consent practices, and separate implementation and validation work.
