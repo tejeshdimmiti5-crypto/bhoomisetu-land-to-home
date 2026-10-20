@@ -195,15 +195,16 @@ export default function DesignPage() {
     if (!selected) { setOpeningsNotice("Select a room before adding a door or window."); return; }
     if (openings.length >= 200) { setOpeningsNotice("This concept editor supports up to 200 openings."); return; }
     const wallLength = openingWall === "north" || openingWall === "south" ? selected.width : selected.depth;
-    const safeWidth = Math.min(openingWidth, wallLength);
-    const safeOffset = Math.max(0, Math.min(openingOffset, wallLength - safeWidth));
-    const next: RoomOpening = { id: `opening-${Date.now()}-${openings.length}`, roomId: selected.id, kind: openingKind, wall: openingWall, offsetM: Number(safeOffset.toFixed(2)), widthM: Number(safeWidth.toFixed(2)) };
+    if (!Number.isFinite(openingOffset) || openingOffset < 0 || !Number.isFinite(openingWidth) || openingWidth <= 0 || openingOffset + openingWidth > wallLength + 1e-9) {
+      setOpeningsNotice(`Opening must fit fully on the selected wall (length ${wallLength.toFixed(2)} m). No values were changed.`);
+      return;
+    }
+    const next: RoomOpening = { id: `opening-${Date.now()}-${openings.length}`, roomId: selected.id, kind: openingKind, wall: openingWall, offsetM: Number(openingOffset.toFixed(2)), widthM: Number(openingWidth.toFixed(2)) };
     const candidate = [...openings, next];
     const checked = validateRoomOpenings(rooms, candidate);
     if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Opening placement is invalid."); return; }
     setOpenings(candidate);
-    setOpeningOffset(Number((safeOffset + safeWidth + 0.1).toFixed(2)));
-    setOpeningWidth(safeWidth);
+    setOpeningsNotice(`Added a ${openingKind} on the ${openingWall} wall of ${selected.name}. Save openings to keep the change.`);
     setOpeningsNotice(`Added a ${openingKind} on the ${openingWall} wall of ${selected.name}. Save openings to keep the change.`);
   }
 
