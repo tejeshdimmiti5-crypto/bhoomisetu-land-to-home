@@ -92,22 +92,36 @@ export default function LandStudioPage() {
   }
 
   function captureGpsCorner() {
-    if (!navigator.geolocation) { setError("This browser does not support GPS location. Use manual drawing instead."); return; }
-    if (!window.isSecureContext) { setError("GPS requires a secure HTTPS page. Reopen Bhoomi Setu using its https:// address."); return; }
-    if (gpsCandidate) { setError("Review or discard the pending GPS point before capturing another."); return; }
-    if (gpsOrigin && ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    if (!navigator.geolocation) {
+      setError("This browser does not support GPS location. Use manual drawing instead.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setError("GPS requires a secure HTTPS page. Reopen Bhoomi Setu using its https:// address.");
+      return;
+    }
+    if (gpsCandidate) {
+      setError("Review or discard the pending GPS point before capturing another.");
+      return;
+    }
+    if (gpsOrigin && ring.length >= 200) {
+      setError("A plot can have at most 200 vertices.");
+      return;
+    }
 
     setGpsBusy(true);
     setError("");
-    setNotice("Requesting your location… Allow location access if Android or Chrome asks. Waiting up to 25 seconds; saved plots will not be changed.");
+    setNotice("Requesting location… Allow location access if Android or Chrome prompts you. This can take up to 25 seconds.");
 
-    // Prevent a stalled Android geolocation request from leaving the button loading forever.
+    // Mobile browsers can sometimes leave a geolocation request pending when the
+    // permission prompt is dismissed or the location provider stalls. Always release
+    // the busy state, and ignore late callbacks after the watchdog has fired.
     let settled = false;
     const watchdog = window.setTimeout(() => {
       if (settled) return;
       settled = true;
       setGpsBusy(false);
-      setError("No GPS response after 25 seconds. Turn on Android Location, allow Chrome site location access, and try outdoors again. Manual drawing is available meanwhile.");
+      setError("No GPS response after 25 seconds. On Android, turn on Location and allow Chrome to use this site's location. If access is set to approximate, enable precise location. Then retry or use manual drawing.");
     }, 25000);
     const finishRequest = () => {
       if (settled) return false;
@@ -123,7 +137,7 @@ export default function LandStudioPage() {
         const origin = gpsOrigin ?? { latitude, longitude };
         const accuracyClass = classifyGpsAccuracy(accuracy);
         if (accuracyClass === "invalid" || accuracyClass === "rejected") {
-          setError(`Android returned ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m accuracy, which is too poor to use safely (limit: 50 m). Turn on Location and Google Location Accuracy, grant Chrome precise location permission, and retry outdoors with a clear view of the sky. This point was not added.`);
+          setError(`Android returned a location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu does not accept fixes worse than 50 m for a plot corner. Turn on Android Location, grant Chrome precise location access, and retry outdoors with a clear view of the sky. Existing saved plots are unchanged.`);
           setGpsBusy(false);
           return;
         }
@@ -135,25 +149,26 @@ export default function LandStudioPage() {
           setGpsBusy(false);
           return;
         }
-        // Keep the existing boundary untouched until the user reviews and confirms this point.
+        // Keep the current boundary and all saved records untouched until the user
+        // explicitly reviews and confirms this pending point.
         setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
         setNotice(accuracyClass === "warning"
-          ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
+          ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. This is imprecise; review carefully and do not treat it as a survey.`
           : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
         setGpsBusy(false);
       }, (cause) => {
         if (!finishRequest()) return;
         setError(cause.code === 1
-          ? "Location permission was denied. In Android Settings, allow location for Chrome and enable precise location for this site, then retry."
+          ? "Location permission was denied. On Android, open Chrome site settings for this page and allow Location, then retry."
           : cause.code === 2
-            ? "Android could not determine a location. Turn on Location and Google Location Accuracy, then retry outdoors."
-            : "GPS timed out. Check Android Location and Chrome site permissions, then retry.");
+            ? "Android could not determine your position. Turn on device Location, move outdoors, and retry."
+            : "GPS timed out. Check Android Location and Chrome site permissions, then retry or use manual drawing.");
         setGpsBusy(false);
       }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-    } catch (cause) {
+    } catch {
       if (finishRequest()) {
-        setError(cause instanceof Error ? `Could not start GPS: ${cause.message}` : "Could not start GPS. Check Chrome location permission and try again.");
         setGpsBusy(false);
+        setError("The browser could not start GPS. Check Chrome location permission and Android Location settings, then retry.");
       }
     }
   }
