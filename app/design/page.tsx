@@ -369,6 +369,11 @@ export default function DesignPage() {
                 points={selectedPlot.ring.map(([x, y]) => `${30 + (x - (plotFit?.plotBounds.minX ?? 0)) * 55},${30 + (y - (plotFit?.plotBounds.minY ?? 0)) * 55}`).join(" ")}
                 fill="#dce8f2" fillOpacity="0.38" stroke="#527a9c" strokeWidth="3" strokeDasharray="8 5"
               />}
+              {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} role="button" tabIndex={0} aria-label={`Select ${room.name}, ${room.width} by ${room.depth} metres`} aria-pressed={room.id === selectedId} style={{cursor:"pointer"}}>
+                <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
+                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize={room.width < 2.4 ? "9" : room.width < 3 ? "10" : "12"} fill="#344d39" fontWeight="600">{room.name.length > Math.max(7, Math.floor(room.width * 3.1)) ? room.name.slice(0, Math.max(6, Math.floor(room.width * 3.1) - 1)) + "…" : room.name}</text>}
+                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="9" fill="#708574">{room.width.toFixed(1)} × {room.depth.toFixed(1)} m</text>}
+              </g>)}
               {openings.map((opening) => {
                 const room = rooms.find((item) => item.id === opening.roomId);
                 if (!room) return null;
@@ -380,11 +385,6 @@ export default function DesignPage() {
                 const y2 = opening.wall === "north" || opening.wall === "south" ? y1 : y1 + length;
                 return <g key={opening.id} aria-label={`${opening.kind} on ${room.name} ${opening.wall} wall`}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={opening.kind === "door" ? "#b66b3c" : "#3183ad"} strokeWidth="5" strokeLinecap="butt"/><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffffff" strokeWidth="1.2" strokeDasharray={opening.kind === "door" ? "2 2" : "4 2"}/></g>;
               })}
-              {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} role="button" tabIndex={0} aria-label={`Select ${room.name}, ${room.width} by ${room.depth} metres`} aria-pressed={room.id === selectedId} style={{cursor:"pointer"}}>
-                <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
-                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize={room.width < 2.4 ? "9" : room.width < 3 ? "10" : "12"} fill="#344d39" fontWeight="600">{room.name.length > Math.max(7, Math.floor(room.width * 3.1)) ? room.name.slice(0, Math.max(6, Math.floor(room.width * 3.1) - 1)) + "…" : room.name}</text>}
-                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="9" fill="#708574">{room.width.toFixed(1)} × {room.depth.toFixed(1)} m</text>}
-              </g>)}
             </svg>
           </div>
           <div className="design-summary">
