@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
 
 jobs:
   generate-lockfile:
@@ -27,7 +26,7 @@ jobs:
           npm install
           npm ci
           cp package-lock.json "$RUNNER_TEMP/package-lock.json"
-      - name: Prepare Commit 2 on target branch
+      - name: Commit lockfile to target branch
         env:
           EXPECTED_TARGET_SHA: a4c414745cd5119467d84c7b6f41e7b54c0064ec
         run: |
@@ -37,26 +36,11 @@ jobs:
             echo "Target branch moved from expected baseline $EXPECTED_TARGET_SHA to $TARGET_SHA; refusing to push."
             exit 1
           fi
-
           git checkout -B fix/ci-baseline-2026-10 FETCH_HEAD
           cp "$RUNNER_TEMP/package-lock.json" package-lock.json
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = '.github/workflows/ci.yml';
-          let text = fs.readFileSync(path, 'utf8');
-          text = text.replace(
-            '          node-version-file: .nvmrc\n          # npm cache is enabled once package-lock.json is committed.',
-            '          node-version-file: .nvmrc\n          cache: npm'
-          );
-          text = text.replace('        run: npm install\n', '        run: npm ci\n');
-          if (!text.includes('          cache: npm') || !text.includes('        run: npm ci')) {
-            throw new Error('Expected CI workflow edits were not applied');
-          }
-          fs.writeFileSync(path, text);
-          NODE
-          git add package-lock.json .github/workflows/ci.yml
+          git add package-lock.json
           git diff --cached --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "ci: use reproducible npm installs"
+          git commit -m "build: add Linux-generated npm lockfile"
           git push origin HEAD:fix/ci-baseline-2026-10
