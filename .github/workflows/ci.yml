@@ -47,6 +47,8 @@ jobs:
         run: npm run test:room-openings
       - name: Area unit regression tests
         run: npm run test:units
+      - name: GPS capture regression tests
+        run: npm run test:gps-capture
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
