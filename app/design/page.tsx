@@ -205,7 +205,6 @@ export default function DesignPage() {
     if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Opening placement is invalid."); return; }
     setOpenings(candidate);
     setOpeningsNotice(`Added a ${openingKind} on the ${openingWall} wall of ${selected.name}. Save openings to keep the change.`);
-    setOpeningsNotice(`Added a ${openingKind} on the ${openingWall} wall of ${selected.name}. Save openings to keep the change.`);
   }
 
   function saveOpenings() {
