@@ -3,16 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { listPlots, type SavedPlot } from "../lib/plot-store";
+import { calculateEstimate } from "../lib/estimate";
 import {
-  ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
+  ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
   FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
   Sparkles, Trees, Wallet, X, Check, Clock3, MoveUpRight
 } from "lucide-react";
-
-const projects = [
-  { name: "Green Meadows Plot", location: "Gudivada, Andhra Pradesh", area: "2,400 sq ft", status: "Plot measured", progress: 32, tone: "mint", mark: "GM" },
-  { name: "Family Home", location: "Vijayawada, Andhra Pradesh", area: "1,800 sq ft", status: "Design in progress", progress: 58, tone: "sand", mark: "FH" },
-];
 
 const features = [
   { icon: Ruler, title: "Measure your land", detail: "Draw boundaries and get area, perimeter and side lengths.", tint: "sage" },
@@ -27,10 +23,32 @@ export default function HomePage() {
   const [projectName, setProjectName] = useState("");
   const [toast, setToast] = useState("");
   const [savedPlots, setSavedPlots] = useState<SavedPlot[]>([]);
+  const [savedDesignCount, setSavedDesignCount] = useState(0);
+  const [budgetTotal, setBudgetTotal] = useState<number | null>(null);
+  const [budgetItemCount, setBudgetItemCount] = useState(0);
 
   useEffect(() => {
     let active = true;
     void listPlots().then((items) => { if (active) setSavedPlots(items); }).catch(() => { if (active) setSavedPlots([]); });
+    try {
+      const designRaw = window.localStorage.getItem("bhoomisetu-design-document-v1");
+      if (designRaw) {
+        const design: unknown = JSON.parse(designRaw);
+        if (design && typeof design === "object" && !Array.isArray(design) &&
+            (design as { schemaVersion?: unknown }).schemaVersion === 1 &&
+            Array.isArray((design as { rooms?: unknown }).rooms)) setSavedDesignCount(1);
+      }
+      const estimateRaw = window.localStorage.getItem("bhoomisetu-estimate-v1");
+      if (estimateRaw) {
+        const estimate = calculateEstimate(JSON.parse(estimateRaw));
+        if (estimate.valid) {
+          setBudgetTotal(estimate.totalINR);
+          setBudgetItemCount(estimate.lineItems.length);
+        }
+      }
+    } catch {
+      // A malformed local record is not shown as a valid dashboard metric.
+    }
     return () => { active = false; };
   }, []);
 
@@ -61,7 +79,7 @@ export default function HomePage() {
         <p className="nav-label">WORKSPACE</p>
         <nav className="nav-list">
           <a className="nav-item active" href="#overview"><Layers3 size={18} /> Overview</a>
-          <a className="nav-item" href="#projects"><MapPin size={18} /> My plots <span className="nav-count">02</span></a>
+          <a className="nav-item" href="#projects"><MapPin size={18} /> My plots <span className="nav-count">{savedPlots.length.toString().padStart(2, "0")}</span></a>
           <Link className="nav-item" href="/design"><Home size={18} /> House designs</Link>
           <Link className="nav-item" href="/estimate"><Wallet size={18} /> Budget planner</Link>
           <a className="nav-item" href="#documents"><FileText size={18} /> Documents</a>
@@ -93,7 +111,7 @@ export default function HomePage() {
           <button className="icon-button mobile-menu" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Menu size={21} /></button>
           <div className="breadcrumb">Workspace <span>/</span> <strong>Overview</strong></div>
           <div className="topbar-actions">
-            <span className="save-status demo-status"><span /> Demo data · not saved</span>
+            <span className="save-status"><span /> Browser-local workspace</span>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={19} /><i /></button>
             <div className="top-avatar">TD</div>
           </div>
@@ -126,12 +144,12 @@ export default function HomePage() {
             </div>
           </section>
 
-          <div className="demo-notice" role="note"><strong>Workspace preview</strong><span>The dashboard cards still contain sample data. Use Land Studio to create, save, edit and back up real local plot records.</span></div>
+          <div className="demo-notice" role="note"><strong>Your data stays local</strong><span>Counts below are read from this browser. Plot records, house plans, and estimates are not synced to an account or cloud.</span></div>
           <section className="stats-grid" aria-label="Workspace summary">
-            <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>02</strong><small><span className="stat-trend"><ArrowDownRight size={13} /></span> Demo metric</small></article>
-            <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>01</strong><small>Demo metric</small></article>
-            <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>—</strong><small>Not connected yet</small></article>
-            <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Next milestone</span><strong className="stat-date">Plot setup</strong><small><Clock3 size={13} /> Demo status</small></article>
+            <article className="stat-card"><span className="stat-icon sage"><MapPin size={19} /></span><span className="stat-label">My plots</span><strong>{savedPlots.length.toString().padStart(2, "0")}</strong><small>{savedPlots.length ? "Saved in this browser" : "No saved plots yet"}</small></article>
+            <article className="stat-card"><span className="stat-icon peach"><Home size={19} /></span><span className="stat-label">House designs</span><strong>{savedDesignCount.toString().padStart(2, "0")}</strong><small>{savedDesignCount ? "Design in this browser" : "No saved design yet"}</small></article>
+            <article className="stat-card"><span className="stat-icon blue"><Wallet size={19} /></span><span className="stat-label">Budget planned</span><strong>{budgetTotal === null ? "—" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(budgetTotal)}</strong><small>{budgetTotal === null ? "No valid estimate saved" : `${budgetItemCount} line items · user-entered rates`}</small></article>
+            <article className="stat-card"><span className="stat-icon lilac"><ShieldCheck size={19} /></span><span className="stat-label">Planning status</span><strong className="stat-date">{savedPlots.length ? "Plot ready" : "Get started"}</strong><small><Clock3 size={13} /> {savedPlots.length ? "Review boundary and measurements" : "Create your first plot"}</small></article>
           </section>
 
           {savedPlots.length > 0 && <section className="projects-section" aria-labelledby="saved-plots-heading">
@@ -158,26 +176,38 @@ export default function HomePage() {
 
           <section className="projects-section" id="projects">
             <div className="section-heading">
-              <div><span className="section-kicker">YOUR WORKSPACE</span><h2>Pick up where you left off</h2><p>All your land and home plans, in one calm place.</p></div>
+              <div><span className="section-kicker">YOUR WORKSPACE</span><h2>Continue your plan</h2><p>Start with real data saved in this browser—no sample properties are presented as yours.</p></div>
               <button className="text-link" onClick={() => setShowCreate(true)}>New project <Plus size={16} /></button>
             </div>
             <div className="project-grid">
-              {projects.map((project) => (
-                <article className="project-card" key={project.name}>
-                  <div className={`project-cover ${project.tone}`}>
-                    <div className="cover-top"><span className="project-mark">{project.mark}</span><button className="cover-more" aria-label={`More options for ${project.name}`}>···</button></div>
-                    <div className="plot-illustration"><div className="plot-outline"><div className="plot-inner"><span className="plot-pin"><MapPin size={16} /></span><span className="plot-label">YOUR PLOT</span><span className="plot-dimensions">40 ft <i /> 60 ft</span></div></div><span className="plot-compass">N <ArrowRight size={12} /></span></div>
-                    <span className="cover-coordinate"><MapPin size={12} /> {project.location}</span>
-                  </div>
-                  <div className="project-details">
-                    <div className="project-title-row"><h3>{project.name}</h3><span className="project-menu-dot">•••</span></div>
-                    <div className="project-meta"><span><Ruler size={14} /> {project.area}</span><span className="project-status"><span /> {project.status}</span></div>
-                    <div className="progress-label"><span>Project progress</span><strong>{project.progress}%</strong></div>
-                    <div className="progress-track"><span style={{ width: `${project.progress}%` }} /></div>
-                    <Link className="project-open" href="/studio">Open Land Studio <ArrowRight size={15} /></Link>
-                  </div>
-                </article>
-              ))}
+              <article className="project-card">
+                <div className="project-cover mint">
+                  <div className="cover-top"><span className="project-mark">LAND</span><span className="project-status"><span /> {savedPlots.length ? "Ready to review" : "Not started"}</span></div>
+                  <div className="plot-illustration"><div className="plot-outline"><div className="plot-inner"><span className="plot-pin"><MapPin size={16} /></span><span className="plot-label">{savedPlots.length ? "YOUR SAVED PLOTS" : "START WITH YOUR LAND"}</span><span className="plot-dimensions">{savedPlots.length} saved</span></div></div></div>
+                  <span className="cover-coordinate"><Ruler size={12} /> Measurements are planning estimates</span>
+                </div>
+                <div className="project-details">
+                  <div className="project-title-row"><h3>{savedPlots.length ? "Your measured land" : "Measure your land"}</h3></div>
+                  <div className="project-meta"><span><Ruler size={14} /> {savedPlots.length} saved plot{savedPlots.length === 1 ? "" : "s"}</span><span className="project-status"><span /> Stored locally</span></div>
+                  <div className="progress-label"><span>Next step</span><strong>{savedPlots.length ? "Review" : "Create"}</strong></div>
+                  <div className="progress-track"><span style={{width: savedPlots.length ? "100%" : "0%"}} /></div>
+                  <Link className="project-open" href="/studio">{savedPlots.length ? "Manage your plots" : "Open Land Studio"} <ArrowRight size={15} /></Link>
+                </div>
+              </article>
+              <article className="project-card">
+                <div className="project-cover sand">
+                  <div className="cover-top"><span className="project-mark">HOME</span><span className="project-status"><span /> {savedDesignCount ? "Saved locally" : "Not started"}</span></div>
+                  <div className="plot-illustration"><div className="plot-outline"><div className="plot-inner"><span className="plot-pin"><Home size={16} /></span><span className="plot-label">YOUR FLOOR PLAN</span><span className="plot-dimensions">{savedDesignCount ? "Saved design" : "No saved design"}</span></div></div></div>
+                  <span className="cover-coordinate"><Home size={12} /> Concept layout only</span>
+                </div>
+                <div className="project-details">
+                  <div className="project-title-row"><h3>{savedDesignCount ? "Your house design" : "Design your home"}</h3></div>
+                  <div className="project-meta"><span><Home size={14} /> {savedDesignCount} saved design{savedDesignCount === 1 ? "" : "s"}</span><span className="project-status"><span /> Browser-local</span></div>
+                  <div className="progress-label"><span>Next step</span><strong>{savedDesignCount ? "Review" : "Create"}</strong></div>
+                  <div className="progress-track"><span style={{width: savedDesignCount ? "100%" : "0%"}} /></div>
+                  <Link className="project-open" href="/design">Open House Design <ArrowRight size={15} /></Link>
+                </div>
+              </article>
               <button className="new-project-card" onClick={() => setShowCreate(true)}><span className="new-project-icon"><Plus size={23} /></span><strong>A new beginning</strong><span>Start planning your land or home</span><span className="new-project-action">Create a project <ArrowRight size={15} /></span></button>
             </div>
           </section>
