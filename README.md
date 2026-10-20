@@ -16,7 +16,7 @@ The active feature branch is `feat/land-studio-local-persistence`. Review and me
 - **Room-opening validation (`lib/room-openings.ts`)**: validates door/window opening data against room wall lengths and detects duplicate IDs and overlaps. This is a validation foundation, **not yet a complete interactive door/window editor or wall-rendering system**.
 - **Estimate (`app/estimate`, `lib/estimate.ts`)**: deterministic arithmetic from user-entered assumptions. It does not provide independently verified live market rates.
 - **Responsive UI and accessibility**: mobile-oriented styling and keyboard/focus affordances on relevant design controls.
-- **CI**: GitHub Actions runs lint, eight deterministic test suites, TypeScript type-checking, and a production build.
+- **CI**: GitHub Actions runs dependency installation from the committed lockfile, lint, deterministic regression suites including GPS capture, TypeScript type-checking, and a production build.
 
 ### Not implemented or not verified as production features
 
@@ -33,7 +33,7 @@ The active feature branch is `feat/land-studio-local-persistence`. Review and me
 - Next.js, React, TypeScript, CSS, and Lucide icons.
 - Local browser persistence: IndexedDB for plots and browser local storage for design documents.
 - Geometry coordinates use a local planar frame measured in metres. GPS-derived coordinates are approximate and are not a substitute for a professional survey.
-- No package lockfile is currently committed, so CI uses `npm install`; dependency resolution is not yet fully reproducible.
+- `package-lock.json` is committed and CI uses `npm ci` for reproducible dependency installation.
 
 ### Requirements
 
@@ -43,7 +43,7 @@ The active feature branch is `feat/land-studio-local-persistence`. Review and me
 ### Run locally
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -58,7 +58,7 @@ npx tsc --noEmit
 npm run build
 ```
 
-The aggregate `npm test` command runs nine suites:
+The aggregate `npm test` command runs ten suites:
 
 1. Polygon geometry
 2. Plot storage/import/export
@@ -69,6 +69,7 @@ The aggregate `npm test` command runs nine suites:
 7. Layout candidates
 8. Room-opening validation
 9. Source-backed area-unit conversions
+10. GPS projection and accuracy classification
 
 Report checks as passing only when the corresponding local or GitHub Actions run confirms success. A green CI run is necessary but does not prove real-device usability or architectural correctness.
 
@@ -90,11 +91,11 @@ Geometry is stored in metres and areas are calculated in square metres. The vers
 ## Current priorities
 
 1. Protect user data: conflict-safe imports, save/reload recovery, strict input validation, and bounded geometry work.
-2. Establish a reproducible dependency lockfile in a network-enabled environment, then switch CI to `npm ci`.
-3. Expand units tests and verify regional land-unit conventions against authoritative local records before release.
-4. Expand test coverage around storage failure, concurrency, malformed backups, and real mobile browsers.
+2. Test GPS capture on real mobile devices and record practical accuracy/permission behavior; automated tests do not validate field accuracy.
+3. Expand storage tests around quota errors, concurrency, malformed backups, and real mobile browsers.
+4. Verify regional land-unit conventions against authoritative local records before release.
 5. Evolve the room editor with an explicit versioned openings model and then render doors/windows from that model.
-6. Only after geometry and data contracts are stable, improve architectural constraints and connect 3D visualization to the same canonical design document.
+6. Improve architectural constraints and connect any future 3D visualization to the same canonical design document.
 
 ## Product limitations
 
