@@ -16,7 +16,8 @@
     "test:layout-candidates": "node scripts/run-layout-candidates-tests.cjs",
     "test": "npm run test:geometry && npm run test:plot-store && npm run test:floor-plan && npm run test:plot-fit && npm run test:design-document && npm run test:estimate && npm run test:layout-candidates && npm run test:room-openings && npm run test:units",
     "test:room-openings": "node scripts/run-room-openings-tests.cjs",
-    "test:units": "node scripts/run-units-tests.cjs"
+    "test:units": "node scripts/run-units-tests.cjs",
+    "test:gps-capture": "node scripts/run-gps-capture-tests.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
