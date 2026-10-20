@@ -93,37 +93,69 @@ export default function LandStudioPage() {
 
   function captureGpsCorner() {
     if (!navigator.geolocation) { setError("This browser does not support GPS location. Use manual drawing instead."); return; }
+    if (!window.isSecureContext) { setError("GPS requires a secure HTTPS page. Reopen Bhoomi Setu using its https:// address."); return; }
     if (gpsCandidate) { setError("Review or discard the pending GPS point before capturing another."); return; }
     if (gpsOrigin && ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+
     setGpsBusy(true);
     setError("");
-    navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      const origin = gpsOrigin ?? { latitude, longitude };
-      const accuracyClass = classifyGpsAccuracy(accuracy);
-      if (accuracyClass === "invalid" || accuracyClass === "rejected") {
-        setError("GPS accuracy is invalid or too poor (over 50 m). Move to a clearer outdoor location or use manual drawing.");
-        setGpsBusy(false);
-        return;
-      }
-      let point: Point2D;
-      try {
-        point = gpsOrigin ? projectGpsToLocal(origin, latitude, longitude) : [0, 0];
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
-        setGpsBusy(false);
-        return;
-      }
-      // Keep the existing boundary untouched until the user reviews and confirms this point.
-      setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
-      setNotice(accuracyClass === "warning"
-        ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
-        : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
+    setNotice("Requesting your location… Allow location access if Android or Chrome asks. Waiting up to 25 seconds; saved plots will not be changed.");
+
+    // Prevent a stalled Android geolocation request from leaving the button loading forever.
+    let settled = false;
+    const watchdog = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
       setGpsBusy(false);
-    }, (cause) => {
-      setError(cause.code === 1 ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === 2 ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
-      setGpsBusy(false);
-    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      setError("No GPS response after 25 seconds. Turn on Android Location, allow Chrome site location access, and try outdoors again. Manual drawing is available meanwhile.");
+    }, 25000);
+    const finishRequest = () => {
+      if (settled) return false;
+      settled = true;
+      window.clearTimeout(watchdog);
+      return true;
+    };
+
+    try {
+      navigator.geolocation.getCurrentPosition((position) => {
+        if (!finishRequest()) return;
+        const { latitude, longitude, accuracy } = position.coords;
+        const origin = gpsOrigin ?? { latitude, longitude };
+        const accuracyClass = classifyGpsAccuracy(accuracy);
+        if (accuracyClass === "invalid" || accuracyClass === "rejected") {
+          setError(`Android returned ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m accuracy, which is too poor to use safely (limit: 50 m). Turn on Location and Google Location Accuracy, grant Chrome precise location permission, and retry outdoors with a clear view of the sky. This point was not added.`);
+          setGpsBusy(false);
+          return;
+        }
+        let point: Point2D;
+        try {
+          point = gpsOrigin ? projectGpsToLocal(origin, latitude, longitude) : [0, 0];
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
+          setGpsBusy(false);
+          return;
+        }
+        // Keep the existing boundary untouched until the user reviews and confirms this point.
+        setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
+        setNotice(accuracyClass === "warning"
+          ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
+          : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
+        setGpsBusy(false);
+      }, (cause) => {
+        if (!finishRequest()) return;
+        setError(cause.code === 1
+          ? "Location permission was denied. In Android Settings, allow location for Chrome and enable precise location for this site, then retry."
+          : cause.code === 2
+            ? "Android could not determine a location. Turn on Location and Google Location Accuracy, then retry outdoors."
+            : "GPS timed out. Check Android Location and Chrome site permissions, then retry.");
+        setGpsBusy(false);
+      }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    } catch (cause) {
+      if (finishRequest()) {
+        setError(cause instanceof Error ? `Could not start GPS: ${cause.message}` : "Could not start GPS. Check Chrome location permission and try again.");
+        setGpsBusy(false);
+      }
+    }
   }
 
   function confirmGpsCorner() {
