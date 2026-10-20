@@ -8,10 +8,12 @@ import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
 import { generatePlotLayoutCandidates, generateRectangularLayoutCandidates, type LayoutCandidate } from "../../lib/layout-candidates";
+import { validateRoomOpenings, type OpeningKind, type RoomOpening, type WallSide } from "../../lib/room-openings";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 const STORAGE_KEY = "bhoomisetu-design-document-v1";
 const LEGACY_STORAGE_KEY = "bhoomisetu-floor-plan-v1";
+const OPENINGS_STORAGE_KEY = "bhoomisetu-room-openings-v1";
 const starterRooms: Room[] = [
   { id: "living", name: "Living", x: 0, y: 0, width: 5, depth: 4 },
   { id: "bedroom-1", name: "Bedroom 1", x: 5, y: 0, width: 3.5, depth: 4 },
@@ -32,6 +34,12 @@ export default function DesignPage() {
   const [candidatePlotWidth, setCandidatePlotWidth] = useState(10);
   const [candidatePlotDepth, setCandidatePlotDepth] = useState(15);
   const [layoutCandidates, setLayoutCandidates] = useState<LayoutCandidate[]>([]);
+  const [openings, setOpenings] = useState<RoomOpening[]>([]);
+  const [openingKind, setOpeningKind] = useState<OpeningKind>("door");
+  const [openingWall, setOpeningWall] = useState<WallSide>("south");
+  const [openingOffset, setOpeningOffset] = useState(0.5);
+  const [openingWidth, setOpeningWidth] = useState(0.9);
+  const [openingsNotice, setOpeningsNotice] = useState("Door and window markers are stored separately from room geometry.");
 
   useEffect(() => {
     try {
@@ -66,6 +74,19 @@ export default function DesignPage() {
       }
     } catch {
       setNotice("Could not restore the previous plan. Original browser data was left untouched.");
+    }
+    try {
+      const rawOpenings = window.localStorage.getItem(OPENINGS_STORAGE_KEY);
+      if (rawOpenings) {
+        const parsedOpenings: unknown = JSON.parse(rawOpenings);
+        if (Array.isArray(parsedOpenings) && parsedOpenings.length <= 200) {
+          const checked = validateRoomOpenings(starterRooms, parsedOpenings);
+          if (checked.valid) setOpenings(parsedOpenings as RoomOpening[]);
+          else setOpeningsNotice("Saved openings need review because they do not match the current room IDs.");
+        }
+      }
+    } catch {
+      setOpeningsNotice("Saved opening data could not be read; original browser data was left untouched.");
     }
     setLoaded(true);
   }, []);
@@ -108,6 +129,7 @@ export default function DesignPage() {
   const validation = useMemo(() => validateFloorPlanRooms(rooms), [rooms]);
   const totalArea = validation.totalRoomAreaM2;
   const hasOverlap = validation.overlappingRoomIds.length > 0;
+  const openingValidation = useMemo(() => validateRoomOpenings(rooms, openings), [rooms, openings]);
 
   function updateSelected(field: "name" | "x" | "y" | "width" | "depth", value: string) {
     if (!selected) return;
@@ -161,6 +183,38 @@ export default function DesignPage() {
     setRooms((current) => [...current, room]);
     setSelectedId(id);
     setNotice("Room added. Adjust its position and dimensions in the editor.");
+  }
+
+  function addOpening() {
+    if (!selected) { setOpeningsNotice("Select a room before adding a door or window."); return; }
+    if (openings.length >= 200) { setOpeningsNotice("This concept editor supports up to 200 openings."); return; }
+    const wallLength = openingWall === "north" || openingWall === "south" ? selected.width : selected.depth;
+    const safeWidth = Math.min(openingKind === "door" ? 0.9 : 1.2, wallLength);
+    const safeOffset = Math.max(0, Math.min(openingOffset, wallLength - safeWidth));
+    const next: RoomOpening = { id: `opening-${Date.now()}-${openings.length}`, roomId: selected.id, kind: openingKind, wall: openingWall, offsetM: Number(safeOffset.toFixed(2)), widthM: Number(safeWidth.toFixed(2)) };
+    const candidate = [...openings, next];
+    const checked = validateRoomOpenings(rooms, candidate);
+    if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Opening placement is invalid."); return; }
+    setOpenings(candidate);
+    setOpeningOffset(Number((safeOffset + safeWidth + 0.1).toFixed(2)));
+    setOpeningWidth(safeWidth);
+    setOpeningsNotice(`Added a ${openingKind} on the ${openingWall} wall of ${selected.name}. Save openings to keep the change.`);
+  }
+
+  function saveOpenings() {
+    const checked = validateRoomOpenings(rooms, openings);
+    if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Correct invalid openings before saving."); return; }
+    try {
+      window.localStorage.setItem(OPENINGS_STORAGE_KEY, JSON.stringify(openings));
+      setOpeningsNotice(`Saved ${openings.length} door/window marker(s) in this browser. These are concept markers, not construction details.`);
+    } catch {
+      setOpeningsNotice("Browser storage is unavailable or full. Opening changes were not saved.");
+    }
+  }
+
+  function removeOpening(id: string) {
+    setOpenings((current) => current.filter((opening) => opening.id !== id));
+    setOpeningsNotice("Opening removed from the editor. Save openings to keep the change.");
   }
 
   function printPlan() {
@@ -273,6 +327,7 @@ export default function DesignPage() {
     if (!selected || rooms.length <= 1) { setNotice("A plan must contain at least one room."); return; }
     const next = rooms.filter((room) => room.id !== selected.id);
     setRooms(next);
+    setOpenings((current) => current.filter((opening) => opening.roomId !== selected.id));
     setSelectedId(next[0].id);
     setNotice("Room removed. Save the plan to keep this change.");
   }
@@ -308,6 +363,17 @@ export default function DesignPage() {
                 points={selectedPlot.ring.map(([x, y]) => `${30 + (x - (plotFit?.plotBounds.minX ?? 0)) * 55},${30 + (y - (plotFit?.plotBounds.minY ?? 0)) * 55}`).join(" ")}
                 fill="#dce8f2" fillOpacity="0.38" stroke="#527a9c" strokeWidth="3" strokeDasharray="8 5"
               />}
+              {openings.map((opening) => {
+                const room = rooms.find((item) => item.id === opening.roomId);
+                if (!room) return null;
+                const start = opening.offsetM * 55;
+                const length = opening.widthM * 55;
+                const x1 = opening.wall === "west" ? 30 + room.x * 55 : opening.wall === "east" ? 30 + (room.x + room.width) * 55 : 30 + room.x * 55 + start;
+                const y1 = opening.wall === "north" ? 30 + room.y * 55 : opening.wall === "south" ? 30 + (room.y + room.depth) * 55 : 30 + room.y * 55 + start;
+                const x2 = opening.wall === "west" || opening.wall === "east" ? x1 : x1 + length;
+                const y2 = opening.wall === "north" || opening.wall === "south" ? y1 : y1 + length;
+                return <g key={opening.id} aria-label={`${opening.kind} on ${room.name} ${opening.wall} wall`}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={opening.kind === "door" ? "#b66b3c" : "#3183ad"} strokeWidth="5" strokeLinecap="butt"/><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffffff" strokeWidth="1.2" strokeDasharray={opening.kind === "door" ? "2 2" : "4 2"}/></g>;
+              })}
               {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} role="button" tabIndex={0} aria-label={`Select ${room.name}, ${room.width} by ${room.depth} metres`} aria-pressed={room.id === selectedId} style={{cursor:"pointer"}}>
                 <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
                 {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize={room.width < 2.4 ? "9" : room.width < 3 ? "10" : "12"} fill="#344d39" fontWeight="600">{room.name.length > Math.max(7, Math.floor(room.width * 3.1)) ? room.name.slice(0, Math.max(6, Math.floor(room.width * 3.1) - 1)) + "…" : room.name}</text>}
@@ -369,6 +435,24 @@ export default function DesignPage() {
             </div>
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
+          <section className="design-candidate-panel" aria-labelledby="openings-heading">
+            <div className="design-room-toolbar"><strong id="openings-heading">Doors & windows</strong><span className="design-storage-note">{openings.length} markers</span></div>
+            <p className="design-storage-note">Add simple wall markers to the selected room. Brown marks are doors; blue marks are windows. This prototype checks wall lengths and marker overlaps only—not wall construction, egress, ventilation, or code compliance.</p>
+            <div className="design-field-grid">
+              <label className="design-label">Type<select className="design-input" value={openingKind} onChange={(event) => { const kind = event.target.value as OpeningKind; setOpeningKind(kind); setOpeningWidth(kind === "door" ? 0.9 : 1.2); }}><option value="door">Door</option><option value="window">Window</option></select></label>
+              <label className="design-label">Wall<select className="design-input" value={openingWall} onChange={(event) => setOpeningWall(event.target.value as WallSide)}><option value="north">North / top</option><option value="east">East / right</option><option value="south">South / bottom</option><option value="west">West / left</option></select></label>
+              <label className="design-label">Offset (m)<input className="design-input" type="number" min="0" step="0.1" value={openingOffset} onChange={(event) => setOpeningOffset(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+              <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+            </div>
+            <button type="button" className="design-export" onClick={addOpening} disabled={!selected}>Add to selected room</button>
+            <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}>Save doors & windows</button>
+            <div role="status" className="design-storage-note">{openingsNotice}</div>
+            {!openingValidation.valid && <ul className="design-warning-text">{openingValidation.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
+            {openings.length > 0 && <div className="design-room-list">{openings.map((opening) => {
+              const room = rooms.find((item) => item.id === opening.roomId);
+              return <div key={opening.id} className="design-room-option"><span>{opening.kind} · {room?.name ?? "Unknown room"} · {opening.wall}</span><small>{opening.offsetM} m offset · {opening.widthM} m wide <button type="button" onClick={() => removeOpening(opening.id)} aria-label={`Remove ${opening.kind}`}>Remove</button></small></div>;
+            })}</div>}
+          </section>
           <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={printPlan}><Printer size={15}/> Print / Save PDF</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
           <p className="design-storage-note">Versioned design saved in this browser only. Older plans remain available as a legacy backup; export JSON before clearing browser data.</p>
         </aside>
