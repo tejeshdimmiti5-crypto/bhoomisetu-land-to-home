@@ -79,10 +79,16 @@ export default function DesignPage() {
       const rawOpenings = window.localStorage.getItem(OPENINGS_STORAGE_KEY);
       if (rawOpenings) {
         const parsedOpenings: unknown = JSON.parse(rawOpenings);
-        if (Array.isArray(parsedOpenings) && parsedOpenings.length <= 200) {
-          const checked = validateRoomOpenings(starterRooms, parsedOpenings);
-          if (checked.valid) setOpenings(parsedOpenings as RoomOpening[]);
-          else setOpeningsNotice("Saved openings need review because they do not match the current room IDs.");
+        if (Array.isArray(parsedOpenings) && parsedOpenings.length <= 200 &&
+            parsedOpenings.every((item) => item && typeof item === "object" &&
+              typeof item.id === "string" && typeof item.roomId === "string" &&
+              (item.kind === "door" || item.kind === "window") &&
+              ["north", "east", "south", "west"].includes(item.wall) &&
+              typeof item.offsetM === "number" && Number.isFinite(item.offsetM) &&
+              typeof item.widthM === "number" && Number.isFinite(item.widthM))) {
+          setOpenings(parsedOpenings as RoomOpening[]);
+        } else {
+          setOpeningsNotice("Saved opening data has an unsupported shape and was not loaded.");
         }
       }
     } catch {
@@ -189,7 +195,7 @@ export default function DesignPage() {
     if (!selected) { setOpeningsNotice("Select a room before adding a door or window."); return; }
     if (openings.length >= 200) { setOpeningsNotice("This concept editor supports up to 200 openings."); return; }
     const wallLength = openingWall === "north" || openingWall === "south" ? selected.width : selected.depth;
-    const safeWidth = Math.min(openingKind === "door" ? 0.9 : 1.2, wallLength);
+    const safeWidth = Math.min(openingWidth, wallLength);
     const safeOffset = Math.max(0, Math.min(openingOffset, wallLength - safeWidth));
     const next: RoomOpening = { id: `opening-${Date.now()}-${openings.length}`, roomId: selected.id, kind: openingKind, wall: openingWall, offsetM: Number(safeOffset.toFixed(2)), widthM: Number(safeWidth.toFixed(2)) };
     const candidate = [...openings, next];
