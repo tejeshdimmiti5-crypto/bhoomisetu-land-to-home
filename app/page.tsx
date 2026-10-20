@@ -5,7 +5,7 @@ import Link from "next/link";
 import { listPlots, type SavedPlot } from "../lib/plot-store";
 import { calculateEstimate } from "../lib/estimate";
 import {
-  ArrowDownRight, ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
+  ArrowRight, Bell, ChevronDown, CircleHelp, Compass,
   FileText, Home, Layers3, MapPin, Menu, Plus, Ruler, ShieldCheck,
   Sparkles, Trees, Wallet, X, Check, Clock3, MoveUpRight
 } from "lucide-react";
