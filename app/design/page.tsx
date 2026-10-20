@@ -219,6 +219,45 @@ export default function DesignPage() {
     }
   }
 
+  function exportOpenings() {
+    const checked = validateRoomOpenings(rooms, openings);
+    if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Correct invalid openings before exporting."); return; }
+    try {
+      const blob = new Blob([JSON.stringify({ schemaVersion: 1, openings }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = "bhoomisetu-openings.json";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setOpeningsNotice("Door/window backup exported. Keep it with the matching room design.");
+    } catch {
+      setOpeningsNotice("Could not export opening backup.");
+    }
+  }
+
+  async function importOpenings(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 200 * 1024) { setOpeningsNotice("Opening backup must be 200 KB or smaller."); return; }
+    try {
+      const raw: unknown = JSON.parse(await file.text());
+      const payload = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as { schemaVersion?: unknown; openings?: unknown } : null;
+      if (!payload || payload.schemaVersion !== 1 || !Array.isArray(payload.openings) || payload.openings.length > 200) {
+        setOpeningsNotice("Opening backup rejected: unsupported format or too many openings.");
+        return;
+      }
+      const checked = validateRoomOpenings(rooms, payload.openings);
+      if (!checked.valid) { setOpeningsNotice(checked.errors[0] ?? "Opening backup does not match this room plan."); return; }
+      window.localStorage.setItem(OPENINGS_STORAGE_KEY, JSON.stringify(payload.openings));
+      setOpenings(payload.openings as RoomOpening[]);
+      setOpeningsNotice("Opening backup validated and imported. Match it with the same room IDs/design.");
+    } catch {
+      setOpeningsNotice("Could not import this opening backup. Original saved data was left unchanged.");
+    }
+  }
+
   function removeOpening(id: string) {
     setOpenings((current) => current.filter((opening) => opening.id !== id));
     setOpeningsNotice("Opening removed from the editor. Save openings to keep the change.");
@@ -452,7 +491,11 @@ export default function DesignPage() {
               <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
             </div>
             <button type="button" className="design-export" onClick={addOpening} disabled={!selected}>Add to selected room</button>
-            <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}>Save doors & windows</button>
+            <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}><Save size={15}/> Save doors & windows</button>
+            <div className="design-room-toolbar">
+              <button type="button" className="design-export" onClick={exportOpenings}><Download size={14}/> Export openings</button>
+              <label className="design-export design-import-label"><FileUp size={14}/> Import openings<input type="file" accept="application/json,.json" onChange={importOpenings}/></label>
+            </div>
             <div role="status" className="design-storage-note">{openingsNotice}</div>
             {!openingValidation.valid && <ul className="design-warning-text">{openingValidation.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
             {openings.length > 0 && <div className="design-room-list">{openings.map((opening) => {
