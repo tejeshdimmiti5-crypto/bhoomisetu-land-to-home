@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
@@ -30,6 +30,7 @@ export default function LandStudioPage() {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const gpsRequestCleanupRef = useRef<(() => void) | null>(null);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -52,6 +53,12 @@ export default function LandStudioPage() {
       setStorageStatus(status === "granted" ? "Persistent storage granted" : status === "denied" ? "Browser may clear local data — export backups" : "Persistent storage request unsupported");
     }).catch(() => setStorageStatus("Browser may clear local data — export backups"));
   }, [refreshPlots]);
+
+  useEffect(() => () => {
+    // getCurrentPosition cannot be cancelled, but stop our watchdog and make late callbacks inert.
+    gpsRequestCleanupRef.current?.();
+    gpsRequestCleanupRef.current = null;
+  }, []);
 
   function updatePoint(index: number, axis: 0 | 1, raw: string) {
     const value = raw.trim() === "" ? 0 : Number(raw);
@@ -104,6 +111,7 @@ export default function LandStudioPage() {
       setError("Review or discard the pending GPS point before capturing another.");
       return;
     }
+    if (gpsBusy || gpsRequestCleanupRef.current) return;
     if (gpsOrigin && ring.length >= 200) {
       setError("A plot can have at most 200 vertices.");
       return;
@@ -120,13 +128,21 @@ export default function LandStudioPage() {
     const watchdog = window.setTimeout(() => {
       if (settled) return;
       settled = true;
+      if (gpsRequestCleanupRef.current === cancelRequest) gpsRequestCleanupRef.current = null;
       setGpsBusy(false);
       setError("No GPS response after 25 seconds. On Android, turn on Location and allow Chrome to use this site's location. If access is set to approximate, enable precise location. Then retry or use manual drawing.");
     }, 25000);
+    const cancelRequest = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(watchdog);
+    };
+    gpsRequestCleanupRef.current = cancelRequest;
     const finishRequest = () => {
       if (settled) return false;
       settled = true;
       window.clearTimeout(watchdog);
+      if (gpsRequestCleanupRef.current === cancelRequest) gpsRequestCleanupRef.current = null;
       return true;
     };
 
