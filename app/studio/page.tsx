@@ -92,6 +92,7 @@ export default function LandStudioPage() {
 
   function finishDrawing() {
     if (drawPoints.length < 3) { setError("Place at least three boundary points before finishing."); return; }
+    cancelGpsRequest();
     setRing(drawPoints.map((point) => [point[0], point[1]] as Point2D));
     setActiveId(undefined);
     setDrawMode(false);
