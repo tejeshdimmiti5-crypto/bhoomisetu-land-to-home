@@ -1,11 +1,10 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
-import { projectGpsToLocal } from "../../lib/gps-projection";
-import { classifyGpsAccuracy } from "../../lib/gps-capture";
+import { buildGpsCandidate, checkPendingGpsCandidate, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -28,8 +27,11 @@ export default function LandStudioPage() {
   const [captureMethod, setCaptureMethod] = useState<"manual" | "gps">("manual");
   const [gpsOrigin, setGpsOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean } | null>(null);
+  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean; editorGeneration: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const gpsRequestCleanupRef = useRef<(() => void) | null>(null);
+  // Increment only for wholesale editor replacement, not ordinary vertex edits.
+  const gpsEditorGenerationRef = useRef(0);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -53,6 +55,12 @@ export default function LandStudioPage() {
     }).catch(() => setStorageStatus("Browser may clear local data — export backups"));
   }, [refreshPlots]);
 
+  useEffect(() => () => {
+    // getCurrentPosition cannot be cancelled, but stop our watchdog and make late callbacks inert.
+    gpsRequestCleanupRef.current?.();
+    gpsRequestCleanupRef.current = null;
+  }, []);
+
   function updatePoint(index: number, axis: 0 | 1, raw: string) {
     const value = raw.trim() === "" ? 0 : Number(raw);
     setRing((current) => current.map((point, i) => {
@@ -64,6 +72,7 @@ export default function LandStudioPage() {
   }
 
   function startDrawing() {
+    cancelGpsRequest();
     setDrawPoints([]);
     setDrawMode(true);
     setError("");
@@ -83,6 +92,7 @@ export default function LandStudioPage() {
 
   function finishDrawing() {
     if (drawPoints.length < 3) { setError("Place at least three boundary points before finishing."); return; }
+    cancelGpsRequest();
     setRing(drawPoints.map((point) => [point[0], point[1]] as Point2D));
     setActiveId(undefined);
     setDrawMode(false);
@@ -91,45 +101,122 @@ export default function LandStudioPage() {
     setNotice("Boundary drawn. Review the measurements and save your plot.");
   }
 
+  function cancelGpsRequest() {
+    gpsEditorGenerationRef.current += 1;
+    gpsRequestCleanupRef.current?.();
+    gpsRequestCleanupRef.current = null;
+    setGpsBusy(false);
+    setGpsCandidate(null);
+  }
+
   function captureGpsCorner() {
-    if (!navigator.geolocation) { setError("This browser does not support GPS location. Use manual drawing instead."); return; }
-    if (gpsCandidate) { setError("Review or discard the pending GPS point before capturing another."); return; }
-    if (gpsOrigin && ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    if (!navigator.geolocation) {
+      setError("This browser does not support GPS location. Use manual drawing instead.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setError("GPS requires a secure HTTPS page. Reopen Bhoomi Setu using its https:// address.");
+      return;
+    }
+    if (gpsCandidate) {
+      setError("Review or discard the pending GPS point before capturing another.");
+      return;
+    }
+    if (gpsBusy || gpsRequestCleanupRef.current) return;
+    if (gpsOrigin && ring.length >= MAX_PLOT_VERTICES) {
+      setError(`A plot can have at most ${MAX_PLOT_VERTICES} vertices.`);
+      return;
+    }
+
+    const requestGeneration = gpsEditorGenerationRef.current;
     setGpsBusy(true);
     setError("");
-    navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      const origin = gpsOrigin ?? { latitude, longitude };
-      const accuracyClass = classifyGpsAccuracy(accuracy);
-      if (accuracyClass === "invalid" || accuracyClass === "rejected") {
-        setError("GPS accuracy is invalid or too poor (over 50 m). Move to a clearer outdoor location or use manual drawing.");
-        setGpsBusy(false);
-        return;
-      }
-      let point: Point2D;
-      try {
-        point = gpsOrigin ? projectGpsToLocal(origin, latitude, longitude) : [0, 0];
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
-        setGpsBusy(false);
-        return;
-      }
-      // Keep the existing boundary untouched until the user reviews and confirms this point.
-      setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
-      setNotice(accuracyClass === "warning"
-        ? `GPS fix received with ±${Math.round(accuracy)} m accuracy. Review carefully; this is too imprecise for reliable surveying.`
-        : `GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it.`);
+    setNotice("Requesting location… Allow location access if Android or Chrome prompts you. This can take up to 25 seconds.");
+
+    // Mobile browsers can sometimes leave a geolocation request pending when the
+    // permission prompt is dismissed or the location provider stalls. Always release
+    // the busy state, and ignore late callbacks after the watchdog has fired.
+    let settled = false;
+    const watchdog = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      if (gpsRequestCleanupRef.current === cancelRequest) gpsRequestCleanupRef.current = null;
       setGpsBusy(false);
-    }, (cause) => {
-      setError(cause.code === 1 ? "Location permission was denied. Enable it in your browser or use manual drawing." : cause.code === 2 ? "GPS position is unavailable. Move outdoors and try again." : "GPS timed out. Try again or use manual drawing.");
-      setGpsBusy(false);
-    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      setError("No GPS response after 25 seconds. On Android, turn on Location and allow Chrome to use this site's location. If access is set to approximate, enable precise location. Then retry or use manual drawing.");
+    }, 25000);
+    const cancelRequest = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(watchdog);
+    };
+    gpsRequestCleanupRef.current = cancelRequest;
+    const finishRequest = () => {
+      if (settled) return false;
+      settled = true;
+      window.clearTimeout(watchdog);
+      if (gpsRequestCleanupRef.current === cancelRequest) gpsRequestCleanupRef.current = null;
+      return true;
+    };
+
+    try {
+      navigator.geolocation.getCurrentPosition((position) => {
+        if (!finishRequest()) return;
+        const { latitude, longitude, accuracy } = position.coords;
+        if (!isGpsEditorGenerationCurrent(requestGeneration, gpsEditorGenerationRef.current)) {
+          setGpsBusy(false);
+          setError("The plot changed while GPS was being requested. No point was added; capture again.");
+          return;
+        }
+        const result = buildGpsCandidate({ latitude, longitude, accuracy }, gpsOrigin);
+        if (!result.ok) {
+          if (result.reason === "accuracy") {
+            setError(`Android returned a reported location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu accepts only finite reported accuracy greater than 0 m and no worse than ±10 m; this reading cannot be used for a plot corner. Move outdoors, wait for a stable fix, check Chrome precise-location permission, and retry. Existing saved plots are unchanged.`);
+          } else {
+            setError("Android returned invalid GPS coordinates. No pending corner was created; existing plot data is unchanged. Retry or use manual drawing.");
+          }
+          setGpsBusy(false);
+          return;
+        }
+        // Keep the current boundary and all saved records untouched until the user
+        // explicitly reviews and confirms this pending point.
+        setGpsCandidate({ ...result.candidate, editorGeneration: requestGeneration });
+        setNotice(`GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it; GPS accuracy is not a legal survey.`);
+        setGpsBusy(false);
+      }, (cause) => {
+        if (!finishRequest()) return;
+        setError(cause.code === 1
+          ? "Location permission was denied. On Android, open Chrome site settings for this page and allow Location, then retry."
+          : cause.code === 2
+            ? "Android could not determine your position. Turn on device Location, move outdoors, and retry."
+            : "GPS timed out. Check Android Location and Chrome site permissions, then retry or use manual drawing.");
+        setGpsBusy(false);
+      }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    } catch {
+      if (finishRequest()) {
+        setGpsBusy(false);
+        setError("The browser could not start GPS. Check Chrome location permission and Android Location settings, then retry.");
+      }
+    }
   }
 
   function confirmGpsCorner() {
     if (!gpsCandidate) return;
     const candidate = gpsCandidate;
+    const generationMatches = isGpsEditorGenerationCurrent(candidate.editorGeneration, gpsEditorGenerationRef.current);
+    const check = checkPendingGpsCandidate(candidate, gpsOrigin, ring.length, generationMatches);
+    if (!check.ok) {
+      setGpsCandidate(null);
+      setError(check.reason === "vertex-limit"
+        ? `A plot can have at most ${MAX_PLOT_VERTICES} vertices, so this GPS point was not added.`
+        : "The plot changed after this GPS reading was requested, so the pending point was discarded and nothing was added. Capture the point again.");
+      return;
+    }
     if (candidate.first) {
+      const isUntouchedStarter = JSON.stringify(ring) === JSON.stringify(starterRing);
+      if (ring.length > 0 && !isUntouchedStarter &&
+          !window.confirm(`This GPS point will start a new boundary and replace the ${ring.length} points currently in the editor. Continue?`)) {
+        return;
+      }
       setRing([candidate.point]);
       setGpsOrigin(candidate.origin);
     } else {
@@ -141,18 +228,17 @@ export default function LandStudioPage() {
     setActiveId(undefined);
     setGpsCandidate(null);
     setError("");
-    setNotice(classifyGpsAccuracy(candidate.accuracy) === "warning"
-      ? `GPS corner added with ±${Math.round(candidate.accuracy)} m accuracy warning. Check and manually correct the coordinates.`
-      : `GPS corner added (±${Math.round(candidate.accuracy)} m reported accuracy). Check the coordinates before saving.`);
+    setNotice("GPS corner added. Verify the coordinates before saving; reported GPS accuracy is not a legal survey.");
   }
 
   function addVertex() {
-    if (ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    if (ring.length >= MAX_PLOT_VERTICES) { setError(`A plot can have at most ${MAX_PLOT_VERTICES} vertices.`); return; }
     const last = ring[ring.length - 1] ?? [0, 0];
     setRing((current) => [...current, [last[0] + 5, last[1] + 5]]);
   }
 
   function startNew() {
+    cancelGpsRequest();
     setActiveId(undefined);
     setName("New plot");
     setRing(starterRing.map((point) => [...point] as Point2D));
@@ -167,6 +253,7 @@ export default function LandStudioPage() {
   }
 
   function loadPlot(plot: SavedPlot) {
+    cancelGpsRequest();
     setActiveId(plot.id);
     setName(plot.name);
     setRing(plot.ring.map((point) => [...point] as Point2D));
@@ -196,6 +283,7 @@ export default function LandStudioPage() {
   }
 
   async function handleDelete() {
+    cancelGpsRequest();
     if (!activeId) { startNew(); return; }
     setBusy(true);
     try {
@@ -266,7 +354,7 @@ export default function LandStudioPage() {
             </div>)}
           </div>
           <button className="studio-add-vertex" onClick={addVertex}><Plus size={15}/> Add vertex</button>
-          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setGpsCandidate(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
+          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { cancelGpsRequest(); setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setGpsCandidate(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
           <div className="studio-actions"><button className="studio-primary-button" disabled={busy || !measurements.value} onClick={handleSave}><Save size={16}/>{busy ? "Saving…" : activeId ? "Save changes" : "Save plot"}</button><button className="studio-secondary-button" onClick={handleExport}><Download size={16}/> Export backup</button><label className="studio-secondary-button studio-import-button"><FileUp size={16}/> Import backup<input type="file" accept="application/json,.json" onChange={handleImport} disabled={busy}/></label>{activeId && <button className="studio-delete-button" disabled={busy} onClick={handleDelete}>Delete</button>}</div>
           <p className="studio-footnote">Saved to this browser using IndexedDB. Local browser storage is not cloud backup; export JSON regularly.</p>
         </section>
@@ -303,7 +391,7 @@ export default function LandStudioPage() {
             </> : <div className="studio-validation-error"><strong>Boundary needs attention</strong><p>{measurements.error}</p><small>Check for crossing edges, repeated points, very narrow slivers or a closed ring.</small></div>}
           </article>
           <article className="studio-card studio-saved-plots"><div className="studio-card-heading"><div><span className="studio-step">LOCAL LIBRARY</span><h2>Saved plots</h2></div><span className="studio-count">{plots.length}</span></div>
-            {plots.length ? <div className="studio-saved-list">{plots.map((plot) => <div className={plot.id === activeId ? "studio-saved-item selected" : "studio-saved-item"} key={plot.id}><button onClick={() => loadPlot(plot)}><strong>{plot.name}</strong><span>{formatArea(plot.areaM2)} m² · v{plot.recordVersion}</span></button><button className="studio-icon-button" aria-label={`Delete ${plot.name}`} onClick={async () => { if (activeId === plot.id) setActiveId(undefined); try { await deletePlot(plot.id); await refreshPlots(); setNotice(`Deleted “${plot.name}”.`); } catch (cause) { setError(cause instanceof Error ? cause.message : "Delete failed."); } }}><Trash2 size={14}/></button></div>)}</div> : <p className="studio-empty-state">Your saved plots will appear here after the first save.</p>}
+            {plots.length ? <div className="studio-saved-list">{plots.map((plot) => <div className={plot.id === activeId ? "studio-saved-item selected" : "studio-saved-item"} key={plot.id}><button onClick={() => loadPlot(plot)}><strong>{plot.name}</strong><span>{formatArea(plot.areaM2)} m² · v{plot.recordVersion}</span></button><button className="studio-icon-button" aria-label={`Delete ${plot.name}`} onClick={async () => { if (activeId === plot.id) { cancelGpsRequest(); setActiveId(undefined); } try { await deletePlot(plot.id); await refreshPlots(); setNotice(`Deleted “${plot.name}”.`); } catch (cause) { setError(cause instanceof Error ? cause.message : "Delete failed."); } }}><Trash2 size={14}/></button></div>)}</div> : <p className="studio-empty-state">Your saved plots will appear here after the first save.</p>}
           </article>
         </section>
       </div>
