@@ -72,6 +72,7 @@ export default function LandStudioPage() {
   }
 
   function startDrawing() {
+    cancelGpsRequest();
     setDrawPoints([]);
     setDrawMode(true);
     setError("");
