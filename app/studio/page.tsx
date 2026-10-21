@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
-import { buildGpsCandidate } from "../../lib/gps-capture";
+import { buildGpsCandidate, checkPendingGpsCandidate, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -27,9 +27,12 @@ export default function LandStudioPage() {
   const [captureMethod, setCaptureMethod] = useState<"manual" | "gps">("manual");
   const [gpsOrigin, setGpsOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean } | null>(null);
+  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean; editorFingerprint: string } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
   const gpsRequestCleanupRef = useRef<(() => void) | null>(null);
+  const gpsEditorFingerprint = JSON.stringify({ activeId, ring, gpsOrigin, captureMethod });
+  const gpsEditorFingerprintRef = useRef(gpsEditorFingerprint);
+  gpsEditorFingerprintRef.current = gpsEditorFingerprint;
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -97,6 +100,13 @@ export default function LandStudioPage() {
     setNotice("Boundary drawn. Review the measurements and save your plot.");
   }
 
+  function cancelGpsRequest() {
+    gpsRequestCleanupRef.current?.();
+    gpsRequestCleanupRef.current = null;
+    setGpsBusy(false);
+    setGpsCandidate(null);
+  }
+
   function captureGpsCorner() {
     if (!navigator.geolocation) {
       setError("This browser does not support GPS location. Use manual drawing instead.");
@@ -111,11 +121,12 @@ export default function LandStudioPage() {
       return;
     }
     if (gpsBusy || gpsRequestCleanupRef.current) return;
-    if (gpsOrigin && ring.length >= 200) {
-      setError("A plot can have at most 200 vertices.");
+    if (gpsOrigin && ring.length >= MAX_PLOT_VERTICES) {
+      setError(`A plot can have at most ${MAX_PLOT_VERTICES} vertices.`);
       return;
     }
 
+    const requestFingerprint = gpsEditorFingerprintRef.current;
     setGpsBusy(true);
     setError("");
     setNotice("Requesting location… Allow location access if Android or Chrome prompts you. This can take up to 25 seconds.");
@@ -149,6 +160,11 @@ export default function LandStudioPage() {
       navigator.geolocation.getCurrentPosition((position) => {
         if (!finishRequest()) return;
         const { latitude, longitude, accuracy } = position.coords;
+        if (gpsEditorFingerprintRef.current !== requestFingerprint) {
+          setGpsBusy(false);
+          setError("The plot changed while GPS was being requested. No point was added; capture again.");
+          return;
+        }
         const result = buildGpsCandidate({ latitude, longitude, accuracy }, gpsOrigin);
         if (!result.ok) {
           if (result.reason === "accuracy") {
@@ -161,7 +177,7 @@ export default function LandStudioPage() {
         }
         // Keep the current boundary and all saved records untouched until the user
         // explicitly reviews and confirms this pending point.
-        setGpsCandidate(result.candidate);
+        setGpsCandidate({ ...result.candidate, editorFingerprint: requestFingerprint });
         setNotice(`GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it; GPS accuracy is not a legal survey.`);
         setGpsBusy(false);
       }, (cause) => {
@@ -184,7 +200,20 @@ export default function LandStudioPage() {
   function confirmGpsCorner() {
     if (!gpsCandidate) return;
     const candidate = gpsCandidate;
+    const check = checkPendingGpsCandidate(candidate, gpsOrigin, ring.length, candidate.editorFingerprint === gpsEditorFingerprintRef.current);
+    if (!check.ok) {
+      setGpsCandidate(null);
+      setError(check.reason === "vertex-limit"
+        ? `A plot can have at most ${MAX_PLOT_VERTICES} vertices, so this GPS point was not added.`
+        : "The plot changed after this GPS reading was requested, so the pending point was discarded and nothing was added. Capture the point again.");
+      return;
+    }
     if (candidate.first) {
+      const isUntouchedStarter = JSON.stringify(ring) === JSON.stringify(starterRing);
+      if (ring.length > 0 && !isUntouchedStarter &&
+          !window.confirm(`This GPS point will start a new boundary and replace the ${ring.length} points currently in the editor. Continue?`)) {
+        return;
+      }
       setRing([candidate.point]);
       setGpsOrigin(candidate.origin);
     } else {
@@ -200,12 +229,13 @@ export default function LandStudioPage() {
   }
 
   function addVertex() {
-    if (ring.length >= 200) { setError("A plot can have at most 200 vertices."); return; }
+    if (ring.length >= MAX_PLOT_VERTICES) { setError(`A plot can have at most ${MAX_PLOT_VERTICES} vertices.`); return; }
     const last = ring[ring.length - 1] ?? [0, 0];
     setRing((current) => [...current, [last[0] + 5, last[1] + 5]]);
   }
 
   function startNew() {
+    cancelGpsRequest();
     setActiveId(undefined);
     setName("New plot");
     setRing(starterRing.map((point) => [...point] as Point2D));
@@ -220,6 +250,7 @@ export default function LandStudioPage() {
   }
 
   function loadPlot(plot: SavedPlot) {
+    cancelGpsRequest();
     setActiveId(plot.id);
     setName(plot.name);
     setRing(plot.ring.map((point) => [...point] as Point2D));
@@ -249,6 +280,7 @@ export default function LandStudioPage() {
   }
 
   async function handleDelete() {
+    cancelGpsRequest();
     if (!activeId) { startNew(); return; }
     setBusy(true);
     try {
@@ -319,7 +351,7 @@ export default function LandStudioPage() {
             </div>)}
           </div>
           <button className="studio-add-vertex" onClick={addVertex}><Plus size={15}/> Add vertex</button>
-          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setGpsCandidate(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
+          <div className="studio-editor-foot"><span>{ring.length} vertices · open ring</span><span>Units: metres · {captureMethod === "gps" ? "GPS-assisted" : "manual"}</span></div>{captureMethod === "gps" && <div className="studio-gps-note" role="note"><strong>GPS capture</strong><span>{gpsAccuracy === null ? "Waiting for first location fix." : `Latest reported accuracy: ±${Math.round(gpsAccuracy)} m.`} GPS readings can drift significantly; revisit points, compare against a proper survey, and do not treat this as a legal boundary.</span><button type="button" onClick={() => { cancelGpsRequest(); setCaptureMethod("manual"); setGpsOrigin(null); setGpsAccuracy(null); setGpsCandidate(null); setNotice("Switched to manual mode. Existing vertex coordinates remain in the editor."); }}>Switch to manual</button></div>}
           <div className="studio-actions"><button className="studio-primary-button" disabled={busy || !measurements.value} onClick={handleSave}><Save size={16}/>{busy ? "Saving…" : activeId ? "Save changes" : "Save plot"}</button><button className="studio-secondary-button" onClick={handleExport}><Download size={16}/> Export backup</button><label className="studio-secondary-button studio-import-button"><FileUp size={16}/> Import backup<input type="file" accept="application/json,.json" onChange={handleImport} disabled={busy}/></label>{activeId && <button className="studio-delete-button" disabled={busy} onClick={handleDelete}>Delete</button>}</div>
           <p className="studio-footnote">Saved to this browser using IndexedDB. Local browser storage is not cloud backup; export JSON regularly.</p>
         </section>

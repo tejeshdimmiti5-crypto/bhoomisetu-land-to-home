@@ -56,3 +56,16 @@ export function buildGpsCandidate(fix: GpsFix, existingOrigin: GeoOrigin | null)
     return { ok: false, reason: "coordinates" };
   }
 }
+
+export const MAX_PLOT_VERTICES = 200;
+export type PendingCandidateCheck = { ok: true } | { ok: false; reason: "stale-origin" | "vertex-limit" };
+/** Pure confirm-time guard. editorStateMatches catches changes that leave GPS origin null. */
+export function checkPendingGpsCandidate(candidate: GpsCandidate, currentOrigin: GeoOrigin | null, currentRingLength: number, editorStateMatches = true): PendingCandidateCheck {
+  if (!editorStateMatches) return { ok: false, reason: "stale-origin" };
+  if (candidate.first) return currentOrigin === null ? { ok: true } : { ok: false, reason: "stale-origin" };
+  if (currentOrigin === null || currentOrigin.latitude !== candidate.origin.latitude || currentOrigin.longitude !== candidate.origin.longitude) {
+    return { ok: false, reason: "stale-origin" };
+  }
+  if (currentRingLength + 1 > MAX_PLOT_VERTICES) return { ok: false, reason: "vertex-limit" };
+  return { ok: true };
+}
