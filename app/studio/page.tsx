@@ -4,8 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
-import { projectGpsToLocal } from "../../lib/gps-projection";
-import { classifyGpsAccuracy, isGpsCandidateEligible } from "../../lib/gps-capture";
+import { buildGpsCandidate } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -150,25 +149,19 @@ export default function LandStudioPage() {
       navigator.geolocation.getCurrentPosition((position) => {
         if (!finishRequest()) return;
         const { latitude, longitude, accuracy } = position.coords;
-        const origin = gpsOrigin ?? { latitude, longitude };
-        const accuracyClass = classifyGpsAccuracy(accuracy);
-        if (!isGpsCandidateEligible(accuracyClass)) {
-          setError(`Android returned a reported location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu accepts only finite reported accuracy greater than 0 m and no worse than ±10 m; this reading cannot be used for a plot corner. Move outdoors, wait for a stable fix, check Chrome precise-location permission, and retry. Existing saved plots are unchanged.`);
-          setGpsBusy(false);
-          return;
-        }
-        let point: Point2D;
-        try {
-          // Validate the first fix too: using [0, 0] directly would bypass coordinate checks.
-          point = projectGpsToLocal(origin, latitude, longitude);
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
+        const result = buildGpsCandidate({ latitude, longitude, accuracy }, gpsOrigin);
+        if (!result.ok) {
+          if (result.reason === "accuracy") {
+            setError(`Android returned a reported location accuracy of ±${Number.isFinite(accuracy) ? Math.round(accuracy) : "unknown"} m. Bhoomi Setu accepts only finite reported accuracy greater than 0 m and no worse than ±10 m; this reading cannot be used for a plot corner. Move outdoors, wait for a stable fix, check Chrome precise-location permission, and retry. Existing saved plots are unchanged.`);
+          } else {
+            setError("Android returned invalid GPS coordinates. No pending corner was created; existing plot data is unchanged. Retry or use manual drawing.");
+          }
           setGpsBusy(false);
           return;
         }
         // Keep the current boundary and all saved records untouched until the user
         // explicitly reviews and confirms this pending point.
-        setGpsCandidate({ point, origin, accuracy, first: !gpsOrigin });
+        setGpsCandidate(result.candidate);
         setNotice(`GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it; GPS accuracy is not a legal survey.`);
         setGpsBusy(false);
       }, (cause) => {
