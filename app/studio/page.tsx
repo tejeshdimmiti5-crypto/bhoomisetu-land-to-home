@@ -143,7 +143,8 @@ export default function LandStudioPage() {
         }
         let point: Point2D;
         try {
-          point = gpsOrigin ? projectGpsToLocal(origin, latitude, longitude) : [0, 0];
+          // Validate the first fix too: using [0, 0] directly would bypass coordinate checks.
+          point = projectGpsToLocal(origin, latitude, longitude);
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "GPS coordinates were invalid.");
           setGpsBusy(false);
