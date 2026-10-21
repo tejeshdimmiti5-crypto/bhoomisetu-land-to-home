@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Home, Plus, Printer, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
-import { validateFloorPlanRooms } from "../../lib/floor-plan";
+import { buildFloorPlanAnnotations, validateFloorPlanRooms } from "../../lib/floor-plan";
 import { checkFloorPlanFitsPlot } from "../../lib/plot-fit";
 import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
@@ -133,9 +133,16 @@ export default function DesignPage() {
     depth: Math.max(1, ...rooms.map((room) => room.y + room.depth)),
   }), [rooms]);
   const validation = useMemo(() => validateFloorPlanRooms(rooms), [rooms]);
+  const annotationData = useMemo(() => buildFloorPlanAnnotations(rooms), [rooms]);
   const totalArea = validation.totalRoomAreaM2;
   const hasOverlap = validation.overlappingRoomIds.length > 0;
   const openingValidation = useMemo(() => validateRoomOpenings(rooms, openings), [rooms, openings]);
+  const dimensionScale = 55;
+  const dimOriginX = 82;
+  const dimOriginY = 82;
+  const svgWidth = Math.max(540, dimOriginX * 2 + planBounds.width * dimensionScale + 120);
+  const svgHeight = Math.max(430, dimOriginY * 2 + planBounds.depth * dimensionScale + 120);
+  const roomDimensionMap = new Map(annotationData.roomLabels.map((label) => [label.id, label.label]));
 
   function updateSelected(field: "name" | "x" | "y" | "width" | "depth", value: string) {
     if (!selected) return;
@@ -167,7 +174,7 @@ export default function DesignPage() {
       setNotice("Could not generate candidates. Check that every room has a valid name and dimensions, and that the rectangular plot dimensions are positive.");
     } else {
       const fitting = generated.filter((candidate) => candidate.valid).length;
-      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit ${selectedPlot ? "the saved plot boundary" : "the entered rectangle"}. Review each candidate before applying it.`);
+      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit ${selectedPlot ? "the saved plot boundary" : "the entered rectangle"}. Review each candidate before applying one.`);
     }
   }
 
@@ -389,55 +396,104 @@ export default function DesignPage() {
         <section className="design-card design-canvas-card">
           <div className="design-card-head"><div><span className="design-kicker">2D FLOOR PLAN</span><h2>{planName || "Untitled home"}</h2></div><span className="design-room-count">{rooms.length} rooms</span></div>
           <div className="design-canvas-wrap">
-            <svg viewBox={`0 0 ${Math.max(380, planBounds.width * 55 + 60, (plotFit?.plotBounds.width ?? 0) * 55 + 60)} ${Math.max(300, planBounds.depth * 55 + 60, (plotFit?.plotBounds.depth ?? 0) * 55 + 60)}`} role="img" aria-label="Editable 2D room layout preview">
-              <defs><pattern id="design-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e7ede4" strokeWidth="0.8"/></pattern></defs>
-              <rect width="100%" height="100%" fill="url(#design-grid)"/>
-              <g className="design-dimension-guides" fill="none" stroke="#7d9280" strokeWidth="1">
-                <line x1="30" y1="19" x2={30 + planBounds.width * 55} y2="19"/>
-                <line x1="30" y1="14" x2="30" y2="24"/>
-                <line x1={30 + planBounds.width * 55} y1="14" x2={30 + planBounds.width * 55} y2="24"/>
-                <line x1="18" y1="30" x2="18" y2={30 + planBounds.depth * 55}/>
-                <line x1="13" y1="30" x2="23" y2="30"/>
-                <line x1="13" y1={30 + planBounds.depth * 55} x2="23" y2={30 + planBounds.depth * 55}/>
+            <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} role="img" aria-label={`Dimensioned floor plan for ${planName || "untitled home"}`} style={{ width: "100%", height: "100%", maxHeight: 620 }}>
+              <defs>
+                <pattern id="design-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e7ede4" strokeWidth="0.8"/></pattern>
+                <marker id="dimension-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#49685a"/>
+                </marker>
+              </defs>
+              <rect width={svgWidth} height={svgHeight} fill="url(#design-grid)" rx="14"/>
+              <g fill="none" stroke="#49685a" strokeWidth="1.4" markerStart="url(#dimension-arrow)" markerEnd="url(#dimension-arrow)">
+                <line x1={dimOriginX} y1={dimOriginY - 28} x2={dimOriginX + planBounds.width * dimensionScale} y2={dimOriginY - 28} />
+                <line x1={dimOriginX} y1={dimOriginY - 34} x2={dimOriginX} y2={dimOriginY - 18} />
+                <line x1={dimOriginX + planBounds.width * dimensionScale} y1={dimOriginY - 34} x2={dimOriginX + planBounds.width * dimensionScale} y2={dimOriginY - 18} />
+                <line x1={dimOriginX - 28} y1={dimOriginY} x2={dimOriginX - 28} y2={dimOriginY + planBounds.depth * dimensionScale} />
+                <line x1={dimOriginX - 34} y1={dimOriginY} x2={dimOriginX - 18} y2={dimOriginY} />
+                <line x1={dimOriginX - 34} y1={dimOriginY + planBounds.depth * dimensionScale} x2={dimOriginX - 18} y2={dimOriginY + planBounds.depth * dimensionScale} />
               </g>
-              <g fill="#536b58" fontSize="10" fontWeight="600">
-                <text x={30 + planBounds.width * 27.5} y="12" textAnchor="middle">{planBounds.width.toFixed(2)} m</text>
-                <text x="10" y={30 + planBounds.depth * 27.5} textAnchor="middle" transform={`rotate(-90 10 ${30 + planBounds.depth * 27.5})`}>{planBounds.depth.toFixed(2)} m</text>
+              <g fill="#2f4f45" fontSize="11" fontWeight="700">
+                <text x={dimOriginX + (planBounds.width * dimensionScale) / 2} y={dimOriginY - 40} textAnchor="middle">{annotationData.overallLabel}</text>
+                <text x={dimOriginX - 46} y={dimOriginY + (planBounds.depth * dimensionScale) / 2} textAnchor="middle" transform={`rotate(-90 ${dimOriginX - 46} ${dimOriginY + (planBounds.depth * dimensionScale) / 2})`}>{annotationData.overallLabel.split("×")[1]?.trim() ?? annotationData.overallLabel}</text>
               </g>
               {selectedPlot && <polygon
-                points={selectedPlot.ring.map(([x, y]) => `${30 + (x - (plotFit?.plotBounds.minX ?? 0)) * 55},${30 + (y - (plotFit?.plotBounds.minY ?? 0)) * 55}`).join(" ")}
+                points={selectedPlot.ring.map(([x, y]) => `${dimOriginX + (x - (plotFit?.plotBounds.minX ?? 0)) * dimensionScale},${dimOriginY + (y - (plotFit?.plotBounds.minY ?? 0)) * dimensionScale}`).join(" ")}
                 fill="#dce8f2" fillOpacity="0.38" stroke="#527a9c" strokeWidth="3" strokeDasharray="8 5"
               />}
-              {rooms.map((room, index) => <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} role="button" tabIndex={0} aria-label={`Select ${room.name}, ${room.width} by ${room.depth} metres`} aria-pressed={room.id === selectedId} style={{cursor:"pointer"}}>
-                <rect x={30 + room.x * 55} y={30 + room.y * 55} width={room.width * 55} height={room.depth * 55} fill={validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : room.id === selectedId ? "#d8e9d4" : (index % 2 ? "#f4eee2" : "#e8f0e5")} stroke={validation.overlappingRoomIds.includes(room.id) ? "#b65b43" : room.id === selectedId ? "#315d48" : "#8ca48c"} strokeWidth={room.id === selectedId ? 3 : 1.8}/>
-                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 - 5} textAnchor="middle" fontSize={room.width < 2.4 ? "9" : room.width < 3 ? "10" : "12"} fill="#344d39" fontWeight="600">{room.name.length > Math.max(7, Math.floor(room.width * 3.1)) ? room.name.slice(0, Math.max(6, Math.floor(room.width * 3.1) - 1)) + "…" : room.name}</text>}
-                {room.width * 55 >= 82 && room.depth * 55 >= 40 && <text x={30 + (room.x + room.width / 2) * 55} y={30 + (room.y + room.depth / 2) * 55 + 12} textAnchor="middle" fontSize="9" fill="#708574">{room.width.toFixed(1)} × {room.depth.toFixed(1)} m</text>}
-              </g>)}
+              {rooms.map((room) => {
+                const left = dimOriginX + room.x * dimensionScale;
+                const top = dimOriginY + room.y * dimensionScale;
+                const widthPx = room.width * dimensionScale;
+                const depthPx = room.depth * dimensionScale;
+                const label = roomDimensionMap.get(room.id) ?? `${room.name}: ${room.width.toFixed(2)} m × ${room.depth.toFixed(2)} m`;
+                const insideLabel = widthPx >= 120 && depthPx >= 70;
+                const isSelected = room.id === selectedId;
+                const roomFill = validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : isSelected ? "#d8ead2" : "#edf3e7";
+                return (
+                  <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} tabIndex={0} role="button" aria-label={`${room.name} room, ${room.width.toFixed(2)} by ${room.depth.toFixed(2)} metres`}>
+                    <rect x={left} y={top} width={widthPx} height={depthPx} fill={roomFill} stroke={isSelected ? "#375f4d" : "#2d4a39"} strokeWidth={isSelected ? 2.4 : 1.8} rx="4"/>
+                    <g fill="#2a3c30" fontSize={insideLabel ? 10 : 9} fontWeight={700}>
+                      {insideLabel ? (
+                        <>
+                          <text x={left + widthPx / 2} y={top + depthPx / 2 - 4} textAnchor="middle">{room.name}</text>
+                          <text x={left + widthPx / 2} y={top + depthPx / 2 + 10} textAnchor="middle">{label.replace(`${room.name}: `, "")}</text>
+                        </>
+                      ) : (
+                        <text x={left + widthPx / 2} y={top - 12} textAnchor="middle">{label}</text>
+                      )}
+                    </g>
+                    <g fill="none" stroke="#4d6352" strokeWidth="1.25" markerStart="url(#dimension-arrow)" markerEnd="url(#dimension-arrow)">
+                      <line x1={left} y1={top - 18} x2={left + widthPx} y2={top - 18} />
+                      <line x1={left} y1={top - 24} x2={left} y2={top - 12} />
+                      <line x1={left + widthPx} y1={top - 24} x2={left + widthPx} y2={top - 12} />
+                      <line x1={left - 18} y1={top} x2={left - 18} y2={top + depthPx} />
+                      <line x1={left - 24} y1={top} x2={left - 12} y2={top} />
+                      <line x1={left - 24} y1={top + depthPx} x2={left - 12} y2={top + depthPx} />
+                    </g>
+                  </g>
+                );
+              })}
               {openings.map((opening) => {
                 const room = rooms.find((item) => item.id === opening.roomId);
                 if (!room) return null;
-                const start = opening.offsetM * 55;
-                const length = opening.widthM * 55;
-                const x1 = opening.wall === "west" ? 30 + room.x * 55 : opening.wall === "east" ? 30 + (room.x + room.width) * 55 : 30 + room.x * 55 + start;
-                const y1 = opening.wall === "north" ? 30 + room.y * 55 : opening.wall === "south" ? 30 + (room.y + room.depth) * 55 : 30 + room.y * 55 + start;
+                const x = dimOriginX + room.x * dimensionScale;
+                const y = dimOriginY + room.y * dimensionScale;
+                const start = opening.offsetM * dimensionScale;
+                const length = opening.widthM * dimensionScale;
+                const x1 = opening.wall === "west" ? x : opening.wall === "east" ? x + room.width * dimensionScale : x + start;
+                const y1 = opening.wall === "north" ? y : opening.wall === "south" ? y + room.depth * dimensionScale : y + start;
                 const x2 = opening.wall === "west" || opening.wall === "east" ? x1 : x1 + length;
                 const y2 = opening.wall === "north" || opening.wall === "south" ? y1 : y1 + length;
-                return <g key={opening.id} aria-label={`${opening.kind} on ${room.name} ${opening.wall} wall`}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={opening.kind === "door" ? "#b66b3c" : "#3183ad"} strokeWidth="5" strokeLinecap="butt"/><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffffff" strokeWidth="1.2" strokeDasharray={opening.kind === "door" ? "2 2" : "4 2"}/></g>;
+                const isDoor = opening.kind === "door";
+                const stroke = isDoor ? "#b66b3c" : "#3d77a8";
+                const arcRadius = Math.max(14, length * 0.55);
+                const arcX = isDoor ? x1 : x1;
+                const arcY = isDoor ? y1 : y1;
+                if (opening.wall === "north" || opening.wall === "south") {
+                  return <g key={opening.id}>
+                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/>
+                    <path d={`M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`} fill="none" stroke={stroke} strokeWidth="1.4" strokeDasharray="3 4"/>
+                  </g>;
+                }
+                return <g key={opening.id}>
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/>
+                  <path d={`M ${arcX} ${arcY} A ${arcRadius} ${arcRadius} 0 0 1 ${x2} ${y2}`} fill="none" stroke={stroke} strokeWidth="1.4" strokeDasharray="3 4"/>
+                </g>;
               })}
             </svg>
           </div>
           <div className="design-summary">
             <div><span>Combined room area</span><strong>{totalArea.toFixed(2)} m²</strong></div>
             <div><span>Approx. footprint bounds</span><strong>{planBounds.width.toFixed(2)} × {planBounds.depth.toFixed(2)} m</strong></div>
-            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? `Overlap: ${validation.overlappingRoomIds.length} rooms` : "No room overlap"}</strong></div>
+            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? `Overlap: ${validation.overlappingRoomIds.length} rooms` : "No overlaps"}</strong></div>
           </div>
-          <p className="design-disclaimer">Concept layout only: this does not include wall thickness, doors, windows, structural columns, setbacks, ventilation, building codes or architect approval. Room area is summed from room rectangles and is not a certified built-up area.</p>
+          <p className="design-disclaimer">Concept layout only: this does not include wall thickness, doors, windows, structural columns, setbacks, ventilation, building codes or architect approved details.</p>
         </section>
         <aside className="design-card design-editor-card">
           <div className="design-card-head"><div><span className="design-kicker">PLAN SETTINGS</span><h2>Make it yours</h2></div><Home size={19} color="#658369"/></div>
           <label className="design-label" htmlFor="design-name">Plan name</label>
           <input id="design-name" className="design-input" maxLength={100} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="My family home"/>
-          <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading} aria-label="Refresh saved plots"><RefreshCw size={14}/> {plotsLoading ? "Loading…" : "Refresh plots"}</button></div>
+          <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading}>Refresh</button></div>
           <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => selectPlot(event.target.value)}>
             <option value="">No plot selected — concept mode</option>
             {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m² · {plot.measurementMethod === "gps" ? "GPS estimate" : "Manual"}</option>)}
@@ -448,19 +504,19 @@ export default function DesignPage() {
             <strong className={plotFit.fits ? "design-ok-text" : "design-warning-text"}>{plotFit.fits ? "Rooms fit inside plot boundary" : "Layout does not fit plot boundary"}</strong>
             <p>Selected plot: {selectedPlot.name} · {selectedPlot.areaM2.toFixed(2)} m² · {selectedPlot.measurementMethod === "gps" ? "GPS-based estimate" : "Manually marked boundary"}</p>
             <ul>{plotFit.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
-            <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y bounds. This does not check setbacks, access, regulations, or construction safety.</p>
+            <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y coordinates.</p>
           </div>}
           <section className="design-candidate-panel" aria-labelledby="candidate-layout-heading">
             <div className="design-room-toolbar"><strong id="candidate-layout-heading">Try layout candidates</strong><span className="design-storage-note">Experimental</span></div>
-            <p className="design-storage-note">Creates simple row-packed concepts. When a saved plot is selected, candidates are checked against its actual polygon and use a small 0.1 m geometric inset. Without a selected plot, candidates are checked only against the entered rectangle. This is not a legal setback and does not check access, doors, circulation, ventilation, structure or regulations.</p>
+            <p className="design-storage-note">Creates simple row-packed concepts. When a saved plot is selected, candidates are checked against its actual polygon and use a small 0.1 m geometric tolerance.</p>
             <div className="design-field-grid">
-              <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
-              <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+              <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(Number(event.target.value) || 0)} /></label>
+              <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(Number(event.target.value) || 0)} /></label>
             </div>
             <button type="button" className="design-export" onClick={generateCandidates}>Generate layout options</button>
             {layoutCandidates.length > 0 && <div className="design-candidate-list">
               {layoutCandidates.map((candidate) => <article className="design-candidate-option" key={candidate.strategy}>
-                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : candidate.strategy === "deep-first" ? "Deeper rooms first" : candidate.strategy === "compact-first" ? "Smaller rooms first" : candidate.strategy === "living-first" ? "Living areas first" : "Wet rooms first"}</strong><span className={candidate.valid ? "design-ok-text" : "design-warning-text"}>{candidate.valid ? (selectedPlot ? "Fits plot boundary" : "Fits rectangle") : "Does not fit"}</span></div>
+                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : candidate.strategy === "deep-first" ? "Deeper rooms first" : candidate.strategy}</strong></div>
                 <p>{candidate.rooms.length} of {rooms.length} rooms placed · {selectedPlot ? "checked against saved plot boundary" : `${candidatePlotWidth} × ${candidatePlotDepth} m rectangle`}</p>
                 {candidate.errors.length > 0 && <ul>{candidate.errors.slice(0, 3).map((error, index) => <li key={index}>{error}</li>)}</ul>}
                 <button type="button" className="design-export" disabled={!candidate.valid} onClick={() => applyCandidate(candidate)}>Apply this candidate</button>
@@ -468,26 +524,26 @@ export default function DesignPage() {
             </div>}
           </section>
           <div className="design-room-toolbar"><strong>Rooms</strong><button type="button" onClick={addRoom} disabled={rooms.length >= 40}><Plus size={14}/> Add room</button></div>
-          <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} aria-pressed={room.id === selectedId} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}><span>{room.name}</span><small>{room.width} × {room.depth} m</small></button>)}</div>
+          <div className="design-room-list">{rooms.map((room) => <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} aria-pressed={room.id === selectedId} className={room.id === selectedId ? "design-room-option selected" : "design-room-option"}>{room.name}</button>)}</div>
           {selected && <div className="design-room-fields">
             <label className="design-label" htmlFor="room-name">Selected room</label>
             <input id="room-name" className="design-input" maxLength={40} value={selected.name} onChange={(event) => updateSelected("name", event.target.value)} />
             <div className="design-field-grid">
-              <label className="design-label">X position (m)<input className="design-input" type="number" min="0" max="30" step="0.5" value={selected.x} onChange={(event) => updateSelected("x", event.target.value)}/></label>
-              <label className="design-label">Y position (m)<input className="design-input" type="number" min="0" max="30" step="0.5" value={selected.y} onChange={(event) => updateSelected("y", event.target.value)}/></label>
-              <label className="design-label">Width (m)<input className="design-input" type="number" min="1" max="15" step="0.5" value={selected.width} onChange={(event) => updateSelected("width", event.target.value)}/></label>
-              <label className="design-label">Depth (m)<input className="design-input" type="number" min="1" max="15" step="0.5" value={selected.depth} onChange={(event) => updateSelected("depth", event.target.value)}/></label>
+              <label className="design-label">X position (m)<input className="design-input" type="number" min="0" max="30" step="0.5" value={selected.x} onChange={(event) => updateSelected("x", event.target.value)} /></label>
+              <label className="design-label">Y position (m)<input className="design-input" type="number" min="0" max="30" step="0.5" value={selected.y} onChange={(event) => updateSelected("y", event.target.value)} /></label>
+              <label className="design-label">Width (m)<input className="design-input" type="number" min="1" max="15" step="0.5" value={selected.width} onChange={(event) => updateSelected("width", event.target.value)} /></label>
+              <label className="design-label">Depth (m)<input className="design-input" type="number" min="1" max="15" step="0.5" value={selected.depth} onChange={(event) => updateSelected("depth", event.target.value)} /></label>
             </div>
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
           <section className="design-candidate-panel" aria-labelledby="openings-heading">
             <div className="design-room-toolbar"><strong id="openings-heading">Doors & windows</strong><span className="design-storage-note">{openings.length} markers</span></div>
-            <p className="design-storage-note">Add simple wall markers to the selected room. Brown marks are doors; blue marks are windows. This prototype checks wall lengths and marker overlaps only—not wall construction, egress, ventilation, or code compliance.</p>
+            <p className="design-storage-note">Add simple wall markers to the selected room. Brown marks are doors; blue marks are windows. This prototype checks wall lengths and marker overlaps against the room geometry.</p>
             <div className="design-field-grid">
-              <label className="design-label">Type<select className="design-input" value={openingKind} onChange={(event) => { const kind = event.target.value as OpeningKind; setOpeningKind(kind); setOpeningWidth(kind === "door" ? 0.9 : 1.2); }}><option value="door">Door</option><option value="window">Window</option></select></label>
-              <label className="design-label">Wall<select className="design-input" value={openingWall} onChange={(event) => setOpeningWall(event.target.value as WallSide)}><option value="north">North / top</option><option value="east">East / right</option><option value="south">South / bottom</option><option value="west">West / left</option></select></label>
-              <label className="design-label">Offset (m)<input className="design-input" type="number" min="0" step="0.1" value={openingOffset} onChange={(event) => setOpeningOffset(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
-              <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(event.target.value.trim() === "" ? 0 : Number(event.target.value))}/></label>
+              <label className="design-label">Type<select className="design-input" value={openingKind} onChange={(event) => { const kind = event.target.value as OpeningKind; setOpeningKind(kind); }}><option value="door">Door</option><option value="window">Window</option></select></label>
+              <label className="design-label">Wall<select className="design-input" value={openingWall} onChange={(event) => setOpeningWall(event.target.value as WallSide)}><option value="north">North</option><option value="east">East</option><option value="south">South</option><option value="west">West</option></select></label>
+              <label className="design-label">Offset (m)<input className="design-input" type="number" min="0" step="0.1" value={openingOffset} onChange={(event) => setOpeningOffset(Number(event.target.value) || 0)} /></label>
+              <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(Number(event.target.value) || 0)} /></label>
             </div>
             <button type="button" className="design-export" onClick={addOpening} disabled={!selected}>Add to selected room</button>
             <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}><Save size={15}/> Save doors & windows</button>
@@ -499,10 +555,10 @@ export default function DesignPage() {
             {!openingValidation.valid && <ul className="design-warning-text">{openingValidation.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
             {openings.length > 0 && <div className="design-room-list">{openings.map((opening) => {
               const room = rooms.find((item) => item.id === opening.roomId);
-              return <div key={opening.id} className="design-room-option"><span>{opening.kind} · {room?.name ?? "Unknown room"} · {opening.wall}</span><small>{opening.offsetM} m offset · {opening.widthM} m wide <button type="button" onClick={() => removeOpening(opening.id)} aria-label={`Remove ${opening.kind}`}>Remove</button></small></div>;
+              return <div key={opening.id} className="design-room-option"><span>{opening.kind} · {room?.name ?? "Unknown room"} · {opening.wall}</span><small>{opening.offsetM} m offset · {opening.widthM} m wide</small></div>;
             })}</div>}
           </section>
-          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={printPlan}><Printer size={15}/> Print / Save PDF</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export JSON</button><label className="design-export design-import-label"><FileUp size={15}/> Import JSON<input type="file" accept="application/json,.json" onChange={importPlan}/></label><button type="button" className="design-reset" onClick={resetPlan}><RotateCcw size={14}/> Reset sample</button></div>
+          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export</button><button type="button" className="design-export" onClick={() => window.print()}><Printer size={15}/> Print</button><button type="button" className="design-export" onClick={resetPlan}><RotateCcw size={15}/> Reset</button><label className="design-export design-import-label"><FileUp size={14}/> Import<input type="file" accept="application/json,.json" onChange={importPlan}/></label></div>
           <p className="design-storage-note">Versioned design saved in this browser only. Older plans remain available as a legacy backup; export JSON before clearing browser data.</p>
         </aside>
       </div>
