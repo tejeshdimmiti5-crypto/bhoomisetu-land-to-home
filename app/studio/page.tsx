@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
 import { buildGpsCandidate, checkPendingGpsCandidate, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
+import { isEditorSessionCurrent } from "../../lib/editor-session";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -32,6 +33,7 @@ export default function LandStudioPage() {
   const gpsRequestCleanupRef = useRef<(() => void) | null>(null);
   // Increment only for wholesale editor replacement, not ordinary vertex edits.
   const gpsEditorGenerationRef = useRef(0);
+  const editorSessionGenerationRef = useRef(0);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -92,6 +94,7 @@ export default function LandStudioPage() {
 
   function finishDrawing() {
     if (drawPoints.length < 3) { setError("Place at least three boundary points before finishing."); return; }
+    editorSessionGenerationRef.current += 1;
     cancelGpsRequest();
     setRing(drawPoints.map((point) => [point[0], point[1]] as Point2D));
     setActiveId(undefined);
@@ -217,9 +220,11 @@ export default function LandStudioPage() {
           !window.confirm(`This GPS point will start a new boundary and replace the ${ring.length} points currently in the editor. Continue?`)) {
         return;
       }
+      editorSessionGenerationRef.current += 1;
       setRing([candidate.point]);
       setGpsOrigin(candidate.origin);
     } else {
+      editorSessionGenerationRef.current += 1;
       setRing((current) => [...current, candidate.point]);
     }
     setGpsAccuracy(candidate.accuracy);
@@ -238,6 +243,7 @@ export default function LandStudioPage() {
   }
 
   function startNew() {
+    editorSessionGenerationRef.current += 1;
     cancelGpsRequest();
     setActiveId(undefined);
     setName("New plot");
@@ -253,6 +259,7 @@ export default function LandStudioPage() {
   }
 
   function loadPlot(plot: SavedPlot) {
+    editorSessionGenerationRef.current += 1;
     cancelGpsRequest();
     setActiveId(plot.id);
     setName(plot.name);
@@ -270,16 +277,28 @@ export default function LandStudioPage() {
   async function handleSave() {
     setError("");
     setBusy(true);
+    const saveSession = editorSessionGenerationRef.current;
+
     try {
       const result = await savePlot({ id: activeId, name, ring, origin: gpsOrigin, measurementMethod: captureMethod });
-      setActiveId(result.plot.id);
-      setName(result.plot.name);
-      setRing(result.plot.ring);
+
+      // Refresh saved records even if the editor was replaced while saving.
       await refreshPlots();
-      setNotice(`Saved “${result.plot.name}” · record version ${result.plot.recordVersion}`);
+
+      // A delayed save must not overwrite a newer editor session.
+      if (isEditorSessionCurrent(saveSession, editorSessionGenerationRef.current)) {
+        setActiveId(result.plot.id);
+        setName(result.plot.name);
+        setRing(result.plot.ring);
+        setNotice(`Saved “${result.plot.name}” · record version ${result.plot.recordVersion}`);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Plot could not be saved.");
-    } finally { setBusy(false); }
+      if (isEditorSessionCurrent(saveSession, editorSessionGenerationRef.current)) {
+        setError(cause instanceof Error ? cause.message : "Plot could not be saved.");
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleDelete() {
