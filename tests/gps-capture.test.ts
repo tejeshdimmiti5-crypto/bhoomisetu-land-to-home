@@ -26,9 +26,10 @@ test("GPS projection handles longitude wrap across the antimeridian", () => {
   assertClose(east[0], 222.39, 0.5);
 });
 
-test("GPS projection rejects invalid coordinates", () => {
+test("GPS projection rejects invalid coordinates in either the origin or the fix", () => {
   assert.throws(() => projectGpsToLocal({ latitude: 91, longitude: 0 }, 0, 0), /finite latitude\/longitude/);
   assert.throws(() => projectGpsToLocal({ latitude: 0, longitude: 0 }, Number.NaN, 0), /finite latitude\/longitude/);
+  assert.throws(() => projectGpsToLocal({ latitude: Number.NaN, longitude: 0 }, Number.NaN, 0), /finite latitude\/longitude/);
 });
 
 const accuracyCases: Array<[number, "invalid" | "acceptable" | "rejected"]> = [
@@ -77,4 +78,9 @@ test("10 m is accepted and eligible for a GPS candidate", () => {
   const classification = classifyGpsAccuracy(10);
   assert.equal(classification, "acceptable");
   assert.equal(isGpsCandidateEligible(classification), true);
+});
+
+test("missing and numeric-string accuracy values are invalid without coercion", () => {
+  assert.equal(classifyGpsAccuracy(undefined as unknown as number), "invalid");
+  assert.equal(classifyGpsAccuracy("10" as unknown as number), "invalid");
 });
