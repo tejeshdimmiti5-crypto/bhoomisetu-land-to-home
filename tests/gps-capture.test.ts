@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projectGpsToLocal } from "../lib/gps-projection";
-import { buildGpsCandidate, checkPendingGpsCandidate, classifyGpsAccuracy, isGpsCandidateEligible, MAX_PLOT_VERTICES } from "../lib/gps-capture";
+import { buildGpsCandidate, checkPendingGpsCandidate, classifyGpsAccuracy, isGpsCandidateEligible, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../lib/gps-capture";
 
 function assertClose(actual: number, expected: number, tolerance = 0.1): void {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${expected} +/- ${tolerance}, got ${actual}`);
@@ -172,4 +172,13 @@ test("MATRIX inputs are not mutated and first-fix origin is echoed unchanged", (
 });
 test("MATRIX accuracy takes precedence over invalid coordinates", () => {
   assert.deepEqual(buildGpsCandidate({ latitude: 91, longitude: 0, accuracy: 50 }, null), { ok: false, reason: "accuracy" });
+});
+
+test("editor generation rejects the first candidate after consecutive identical New plot resets", () => {
+  // Content-based state can be identical after both resets; the monotonically increasing
+  // generation distinguishes the candidate captured before the second reset.
+  const generationAtFirstRequest = 1;
+  const generationAfterSecondNewPlot = 2;
+  assert.equal(isGpsEditorGenerationCurrent(generationAtFirstRequest, generationAtFirstRequest), true);
+  assert.equal(isGpsEditorGenerationCurrent(generationAtFirstRequest, generationAfterSecondNewPlot), false);
 });

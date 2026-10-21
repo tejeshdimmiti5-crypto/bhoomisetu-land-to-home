@@ -59,9 +59,13 @@ export function buildGpsCandidate(fix: GpsFix, existingOrigin: GeoOrigin | null)
 
 export const MAX_PLOT_VERTICES = 200;
 export type PendingCandidateCheck = { ok: true } | { ok: false; reason: "stale-origin" | "vertex-limit" };
-/** Pure confirm-time guard. editorStateMatches catches changes that leave GPS origin null. */
-export function checkPendingGpsCandidate(candidate: GpsCandidate, currentOrigin: GeoOrigin | null, currentRingLength: number, editorStateMatches = true): PendingCandidateCheck {
-  if (!editorStateMatches) return { ok: false, reason: "stale-origin" };
+/** True only when a pending GPS point belongs to the current editor generation. */
+export function isGpsEditorGenerationCurrent(candidateGeneration: number, currentGeneration: number): boolean {
+  return candidateGeneration === currentGeneration;
+}
+/** Pure confirm-time guard against stale editor generations, origin changes, and a full ring. */
+export function checkPendingGpsCandidate(candidate: GpsCandidate, currentOrigin: GeoOrigin | null, currentRingLength: number, editorGenerationMatches = true): PendingCandidateCheck {
+  if (!editorGenerationMatches) return { ok: false, reason: "stale-origin" };
   if (candidate.first) return currentOrigin === null ? { ok: true } : { ok: false, reason: "stale-origin" };
   if (currentOrigin === null || currentOrigin.latitude !== candidate.origin.latitude || currentOrigin.longitude !== candidate.origin.longitude) {
     return { ok: false, reason: "stale-origin" };

@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
-import { buildGpsCandidate, checkPendingGpsCandidate, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
+import { buildGpsCandidate, checkPendingGpsCandidate, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -27,12 +27,11 @@ export default function LandStudioPage() {
   const [captureMethod, setCaptureMethod] = useState<"manual" | "gps">("manual");
   const [gpsOrigin, setGpsOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean; editorFingerprint: string } | null>(null);
+  const [gpsCandidate, setGpsCandidate] = useState<{ point: Point2D; origin: { latitude: number; longitude: number }; accuracy: number; first: boolean; editorGeneration: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
   const gpsRequestCleanupRef = useRef<(() => void) | null>(null);
-  const gpsEditorFingerprint = JSON.stringify({ activeId, ring, gpsOrigin, captureMethod });
-  const gpsEditorFingerprintRef = useRef(gpsEditorFingerprint);
-  gpsEditorFingerprintRef.current = gpsEditorFingerprint;
+  // Increment only for wholesale editor replacement, not ordinary vertex edits.
+  const gpsEditorGenerationRef = useRef(0);
 
   const measurements = useMemo(() => {
     try { return { value: measurePolygon(ring), error: "" }; }
@@ -101,6 +100,7 @@ export default function LandStudioPage() {
   }
 
   function cancelGpsRequest() {
+    gpsEditorGenerationRef.current += 1;
     gpsRequestCleanupRef.current?.();
     gpsRequestCleanupRef.current = null;
     setGpsBusy(false);
@@ -126,7 +126,7 @@ export default function LandStudioPage() {
       return;
     }
 
-    const requestFingerprint = gpsEditorFingerprintRef.current;
+    const requestGeneration = gpsEditorGenerationRef.current;
     setGpsBusy(true);
     setError("");
     setNotice("Requesting location… Allow location access if Android or Chrome prompts you. This can take up to 25 seconds.");
@@ -160,7 +160,7 @@ export default function LandStudioPage() {
       navigator.geolocation.getCurrentPosition((position) => {
         if (!finishRequest()) return;
         const { latitude, longitude, accuracy } = position.coords;
-        if (gpsEditorFingerprintRef.current !== requestFingerprint) {
+        if (!isGpsEditorGenerationCurrent(requestGeneration, gpsEditorGenerationRef.current)) {
           setGpsBusy(false);
           setError("The plot changed while GPS was being requested. No point was added; capture again.");
           return;
@@ -177,7 +177,7 @@ export default function LandStudioPage() {
         }
         // Keep the current boundary and all saved records untouched until the user
         // explicitly reviews and confirms this pending point.
-        setGpsCandidate({ ...result.candidate, editorFingerprint: requestFingerprint });
+        setGpsCandidate({ ...result.candidate, editorGeneration: requestGeneration });
         setNotice(`GPS fix received with ±${Math.round(accuracy)} m reported accuracy. Review the point before adding it; GPS accuracy is not a legal survey.`);
         setGpsBusy(false);
       }, (cause) => {
@@ -200,7 +200,8 @@ export default function LandStudioPage() {
   function confirmGpsCorner() {
     if (!gpsCandidate) return;
     const candidate = gpsCandidate;
-    const check = checkPendingGpsCandidate(candidate, gpsOrigin, ring.length, candidate.editorFingerprint === gpsEditorFingerprintRef.current);
+    const generationMatches = isGpsEditorGenerationCurrent(candidate.editorGeneration, gpsEditorGenerationRef.current);
+    const check = checkPendingGpsCandidate(candidate, gpsOrigin, ring.length, generationMatches);
     if (!check.ok) {
       setGpsCandidate(null);
       setError(check.reason === "vertex-limit"
