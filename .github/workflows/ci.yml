@@ -49,6 +49,8 @@ jobs:
         run: npm run test:units
       - name: GPS capture regression tests
         run: npm run test:gps-capture
+      - name: Editor session regression tests
+        run: npm run test:editor-session
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build
