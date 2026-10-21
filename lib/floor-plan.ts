@@ -20,6 +20,24 @@ export interface FloorPlanValidation {
   overlappingRoomIds: string[];
 }
 
+export interface FloorPlanRoomDimensionLabel {
+  id: string;
+  name: string;
+  width: number;
+  depth: number;
+  label: string;
+  x: number;
+  y: number;
+}
+
+export interface FloorPlanAnnotations {
+  valid: boolean;
+  errors: string[];
+  bounds: FloorPlanBounds;
+  overallLabel: string;
+  roomLabels: FloorPlanRoomDimensionLabel[];
+}
+
 const MAX_ROOMS = 40;
 const MAX_POSITION_M = 30;
 const MAX_DIMENSION_M = 15;
@@ -27,6 +45,46 @@ const MIN_DIMENSION_M = 1;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+export function formatMetricDimension(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(2)} m`;
+}
+
+export function formatRoomDimensionLabel(room: Pick<FloorPlanRoom, "name" | "width" | "depth">): string {
+  return `${room.name}: ${formatMetricDimension(room.width)} × ${formatMetricDimension(room.depth)}`;
+}
+
+export function buildFloorPlanAnnotations(rooms: FloorPlanRoom[]): FloorPlanAnnotations {
+  const validation = validateFloorPlanRooms(rooms);
+  if (!validation.valid) {
+    return {
+      valid: false,
+      errors: validation.errors,
+      bounds: validation.bounds,
+      overallLabel: "Unavailable",
+      roomLabels: [],
+    };
+  }
+
+  const roomLabels = rooms.map((room) => ({
+    id: room.id,
+    name: room.name,
+    width: room.width,
+    depth: room.depth,
+    label: formatRoomDimensionLabel(room),
+    x: room.x + room.width / 2,
+    y: room.y + room.depth / 2,
+  }));
+
+  return {
+    valid: true,
+    errors: [],
+    bounds: validation.bounds,
+    overallLabel: `${formatMetricDimension(validation.bounds.width)} × ${formatMetricDimension(validation.bounds.depth)}`,
+    roomLabels,
+  };
 }
 
 /** Positive-area rectangle intersection. Rooms that only share an edge are not overlapping. */
