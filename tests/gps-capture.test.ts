@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projectGpsToLocal } from "../lib/gps-projection";
-import { classifyGpsAccuracy, isGpsCandidateEligible } from "../lib/gps-capture";
+import { buildGpsCandidate, classifyGpsAccuracy, isGpsCandidateEligible } from "../lib/gps-capture";
 
 function assertClose(actual: number, expected: number, tolerance = 0.1): void {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${expected} +/- ${tolerance}, got ${actual}`);
@@ -83,4 +83,34 @@ test("10 m is accepted and eligible for a GPS candidate", () => {
 test("missing and numeric-string accuracy values are invalid without coercion", () => {
   assert.equal(classifyGpsAccuracy(undefined as unknown as number), "invalid");
   assert.equal(classifyGpsAccuracy("10" as unknown as number), "invalid");
+});
+
+test("invalid first GPS fix with acceptable accuracy creates no candidate", () => {
+  const result = buildGpsCandidate({ latitude: 91, longitude: 0, accuracy: 5 }, null);
+  assert.deepEqual(result, { ok: false, reason: "coordinates" });
+});
+
+test("invalid later GPS fix with acceptable accuracy creates no candidate and preserves origin", () => {
+  const existingOrigin = { latitude: 16, longitude: 80 };
+  const result = buildGpsCandidate({ latitude: 91, longitude: 0, accuracy: 5 }, existingOrigin);
+  assert.deepEqual(result, { ok: false, reason: "coordinates" });
+  assert.deepEqual(existingOrigin, { latitude: 16, longitude: 80 });
+});
+
+test("valid first and later GPS fixes produce candidates only when coordinates and accuracy are valid", () => {
+  const first = buildGpsCandidate({ latitude: 16, longitude: 80, accuracy: 5 }, null);
+  assert.equal(first.ok, true);
+  if (first.ok) {
+    assert.equal(first.candidate.first, true);
+    assert.deepEqual(first.candidate.point, [0, 0]);
+  }
+
+  const later = buildGpsCandidate({ latitude: 16.0001, longitude: 80, accuracy: 10 }, { latitude: 16, longitude: 80 });
+  assert.equal(later.ok, true);
+  if (later.ok) assert.equal(later.candidate.first, false);
+});
+
+test("invalid accuracy never produces a GPS candidate", () => {
+  const result = buildGpsCandidate({ latitude: 16, longitude: 80, accuracy: 10.0001 }, null);
+  assert.deepEqual(result, { ok: false, reason: "accuracy" });
 });
