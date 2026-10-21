@@ -29,7 +29,7 @@ test("GPS projection handles longitude wrap across the antimeridian", () => {
 test("GPS projection rejects invalid coordinates in either the origin or the fix", () => {
   assert.throws(() => projectGpsToLocal({ latitude: 91, longitude: 0 }, 0, 0), /finite latitude\/longitude/);
   assert.throws(() => projectGpsToLocal({ latitude: 0, longitude: 0 }, Number.NaN, 0), /finite latitude\/longitude/);
-  assert.throws(() => projectGpsToLocal({ latitude: Number.NaN, longitude: 0 }, Number.NaN, 0), /finite latitude\/longitude/);
+  assert.throws(() => projectGpsToLocal({ latitude: Number.NaN, longitude: 0 }, 0, 0), /finite latitude\/longitude/);
 });
 
 const accuracyCases: Array<[number, "invalid" | "acceptable" | "rejected"]> = [
