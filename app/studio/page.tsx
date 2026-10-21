@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
 import { buildGpsCandidate, checkPendingGpsCandidate, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
+import { isEditorSessionCurrent } from "../../lib/editor-session";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
 
 const starterRing: Point2D[] = [[0, 0], [20, 0], [20, 15], [0, 15]];
@@ -285,14 +286,14 @@ export default function LandStudioPage() {
       await refreshPlots();
 
       // A delayed save must not overwrite a newer editor session.
-      if (editorSessionGenerationRef.current === saveSession) {
+      if (isEditorSessionCurrent(saveSession, editorSessionGenerationRef.current)) {
         setActiveId(result.plot.id);
         setName(result.plot.name);
         setRing(result.plot.ring);
         setNotice(`Saved “${result.plot.name}” · record version ${result.plot.recordVersion}`);
       }
     } catch (cause) {
-      if (editorSessionGenerationRef.current === saveSession) {
+      if (isEditorSessionCurrent(saveSession, editorSessionGenerationRef.current)) {
         setError(cause instanceof Error ? cause.message : "Plot could not be saved.");
       }
     } finally {
