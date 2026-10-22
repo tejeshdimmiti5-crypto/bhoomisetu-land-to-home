@@ -9,6 +9,7 @@ import { listPlots, type SavedPlot } from "../../lib/plot-store";
 import { migrateLegacyFloorPlan, parseHouseDesignDocument, serializeHouseDesignDocument, type HouseDesignDocument } from "../../lib/house-design-document";
 import { generatePlotLayoutCandidates, generateRectangularLayoutCandidates, type LayoutCandidate } from "../../lib/layout-candidates";
 import { validateRoomOpenings, type OpeningKind, type RoomOpening, type WallSide } from "../../lib/room-openings";
+import HouseRequirementsWizard, { type RequirementRoom } from "./requirements-wizard";
 
 type Room = { id: string; name: string; x: number; y: number; width: number; depth: number };
 const STORAGE_KEY = "bhoomisetu-design-document-v1";
@@ -40,6 +41,7 @@ export default function DesignPage() {
   const [openingOffset, setOpeningOffset] = useState(0.5);
   const [openingWidth, setOpeningWidth] = useState(0.9);
   const [openingsNotice, setOpeningsNotice] = useState("Door and window markers are stored separately from room geometry.");
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -162,6 +164,29 @@ export default function DesignPage() {
     const depth = Math.max(...ys) - Math.min(...ys);
     if (Number.isFinite(width) && width > 0) setCandidatePlotWidth(Number(width.toFixed(2)));
     if (Number.isFinite(depth) && depth > 0) setCandidatePlotDepth(Number(depth.toFixed(2)));
+  }
+
+  function applyRequirements(requirementRooms: RequirementRoom[], style: string, special: string) {
+    if (requirementRooms.length === 0 || requirementRooms.length > 40) {
+      setNotice("Choose between 1 and 40 spaces before generating a layout.");
+      return;
+    }
+    setRooms(requirementRooms);
+    setSelectedId(requirementRooms[0].id);
+    setPlanName(`${style.split(" · ")[0]} family home`);
+    const requirements = requirementRooms.map(({ id, name, width, depth }) => ({ id, name, width, depth }));
+    const generated = selectedPlot
+      ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
+      : generateRectangularLayoutCandidates(requirements, candidatePlotWidth, candidatePlotDepth);
+    setLayoutCandidates(generated);
+    setRequirementsOpen(false);
+    if (generated.length === 0) {
+      setNotice("Your room requirements were created, but no candidates could be generated. Check plot dimensions and room sizes.");
+    } else {
+      const fitting = generated.filter((candidate) => candidate.valid).length;
+      const preferenceNote = special.trim() ? ` Special request recorded for review: ${special.trim()}.` : "";
+      setNotice(`Created ${requirementRooms.length} requested spaces in a ${style.split(" · ")[0]} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
+    }
   }
 
   function generateCandidates() {
@@ -389,9 +414,10 @@ export default function DesignPage() {
       <header className="design-header">
         <Link className="design-back" href="/"><ArrowLeft size={16}/> Workspace</Link>
         <div><span className="design-eyebrow">BHOOMISETU · HOME DESIGN</span><h1>Shape your home</h1><p>Build a simple, editable 2D room layout. Dimensions are in metres.</p></div>
-        <span className="design-local-badge">Browser-local prototype</span>
+        <button type="button" className="design-wizard-trigger" onClick={() => setRequirementsOpen((open) => !open)}><Home size={15}/>{requirementsOpen ? "Close home planner" : "Plan from my requirements"}</button>
       </header>
       <div className="design-notice" role="status">{notice}</div>
+      {requirementsOpen && <HouseRequirementsWizard onGenerate={(requirementRooms, style) => applyRequirements(requirementRooms, style, style.includes(" · Special requests: ") ? style.split(" · Special requests: ").slice(1).join(" · ") : "")} onCancel={() => setRequirementsOpen(false)} />}
       <div className="design-layout">
         <section className="design-card design-canvas-card">
           <div className="design-card-head"><div><span className="design-kicker">2D FLOOR PLAN</span><h2>{planName || "Untitled home"}</h2></div><span className="design-room-count">{rooms.length} rooms</span></div>
