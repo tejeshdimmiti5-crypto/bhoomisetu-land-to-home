@@ -171,13 +171,15 @@ export default function DesignPage() {
       setNotice("Choose between 1 and 40 spaces before generating a layout.");
       return;
     }
-    setRooms(requirementRooms);
-    setSelectedId(requirementRooms[0].id);
     setPlanName(`${style.split(" · ")[0]} family home`);
     const requirements = requirementRooms.map(({ id, name, width, depth }) => ({ id, name, width, depth }));
     const generated = selectedPlot
       ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
       : generateRectangularLayoutCandidates(requirements, candidatePlotWidth, candidatePlotDepth);
+    const firstValidCandidate = generated.find((candidate) => candidate.valid);
+    const previewRooms = firstValidCandidate?.rooms ?? requirementRooms;
+    setRooms(previewRooms);
+    setSelectedId(previewRooms[0]?.id ?? "");
     setLayoutCandidates(generated);
     setRequirementsOpen(false);
     if (generated.length === 0) {
