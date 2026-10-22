@@ -166,12 +166,16 @@ export default function DesignPage() {
     if (Number.isFinite(depth) && depth > 0) setCandidatePlotDepth(Number(depth.toFixed(2)));
   }
 
-  function applyRequirements(requirementRooms: RequirementRoom[], style: string, special: string) {
+  function applyRequirements(requirementRooms: RequirementRoom[], styleWithSpecial: string) {
     if (requirementRooms.length === 0 || requirementRooms.length > 40) {
       setNotice("Choose between 1 and 40 spaces before generating a layout.");
       return;
     }
-    setPlanName(`${style.split(" · ")[0]} family home`);
+    const specialMarker = " · Special requests: ";
+    const markerIndex = styleWithSpecial.indexOf(specialMarker);
+    const style = markerIndex >= 0 ? styleWithSpecial.slice(0, markerIndex) : styleWithSpecial;
+    const special = markerIndex >= 0 ? styleWithSpecial.slice(markerIndex + specialMarker.length).trim() : "";
+    setPlanName(`${style} family home`);
     const requirements = requirementRooms.map(({ id, name, width, depth }) => ({ id, name, width, depth }));
     const generated = selectedPlot
       ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
@@ -187,7 +191,7 @@ export default function DesignPage() {
     } else {
       const fitting = generated.filter((candidate) => candidate.valid).length;
       const preferenceNote = special.trim() ? ` Special request recorded for review: ${special.trim()}.` : "";
-      setNotice(`Created ${requirementRooms.length} requested spaces in a ${style.split(" · ")[0]} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
+      setNotice(`Created ${requirementRooms.length} requested spaces in a ${style} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
     }
   }
 
