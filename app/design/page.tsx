@@ -205,7 +205,7 @@ export default function DesignPage() {
       setNotice("Could not generate candidates. Check that every room has a valid name and dimensions, and that the rectangular plot dimensions are positive.");
     } else {
       const fitting = generated.filter((candidate) => candidate.valid).length;
-      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit ${selectedPlot ? "the saved plot boundary" : "the entered rectangle"}. Review each candidate before applying one.`);
+      setNotice(`Generated ${generated.length} deterministic concept layouts; ${fitting} fit ${selectedPlot ? "the saved plot boundary" : "the entered rectangle"}. Review each candidate before applying.`);
     }
   }
 
@@ -423,7 +423,7 @@ export default function DesignPage() {
         <button type="button" className="design-wizard-trigger" onClick={() => setRequirementsOpen((open) => !open)}><Home size={15}/>{requirementsOpen ? "Close home planner" : "Plan from my requirements"}</button>
       </header>
       <div className="design-notice" role="status">{notice}</div>
-      {requirementsOpen && <HouseRequirementsWizard onGenerate={(requirementRooms, style) => applyRequirements(requirementRooms, style, style.includes(" · Special requests: ") ? style.split(" · Special requests: ").slice(1).join(" · ") : "")} onCancel={() => setRequirementsOpen(false)} />}
+      {requirementsOpen && <HouseRequirementsWizard onGenerate={(requirementRooms, style) => applyRequirements(requirementRooms, style)} onCancel={() => setRequirementsOpen(false)} />}
       <div className="design-layout">
         <section className="design-card design-canvas-card">
           <div className="design-card-head"><div><span className="design-kicker">2D FLOOR PLAN</span><h2>{planName || "Untitled home"}</h2></div><span className="design-room-count">{rooms.length} rooms</span></div>
@@ -446,7 +446,7 @@ export default function DesignPage() {
               </g>
               <g fill="#2f4f45" fontSize="11" fontWeight="700">
                 <text x={dimOriginX + (planBounds.width * dimensionScale) / 2} y={dimOriginY - 40} textAnchor="middle">{annotationData.overallLabel}</text>
-                <text x={dimOriginX - 46} y={dimOriginY + (planBounds.depth * dimensionScale) / 2} textAnchor="middle" transform={`rotate(-90 ${dimOriginX - 46} ${dimOriginY + (planBounds.depth * dimensionScale) / 2})`}>{annotationData.overallLabel.split("×")[1]?.trim() ?? annotationData.overallLabel}</text>
+                <text x={dimOriginX - 46} y={dimOriginY + (planBounds.depth * dimensionScale) / 2} textAnchor="middle" transform={`rotate(-90 ${dimOriginX - 46} ${dimOriginY + (planBounds.depth * dimensionScale) / 2})`}>{annotationData.overallLabel}</text>
               </g>
               {selectedPlot && <polygon
                 points={selectedPlot.ring.map(([x, y]) => `${dimOriginX + (x - (plotFit?.plotBounds.minX ?? 0)) * dimensionScale},${dimOriginY + (y - (plotFit?.plotBounds.minY ?? 0)) * dimensionScale}`).join(" ")}
@@ -462,7 +462,7 @@ export default function DesignPage() {
                 const isSelected = room.id === selectedId;
                 const roomFill = validation.overlappingRoomIds.includes(room.id) ? "#f7dfd7" : isSelected ? "#d8ead2" : "#edf3e7";
                 return (
-                  <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} tabIndex={0} role="button" aria-label={`${room.name} room, ${room.width.toFixed(2)} by ${room.depth.toFixed(2)} metres`}>
+                  <g key={room.id} onClick={() => setSelectedId(room.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(room.id); } }} tabIndex={0} role="button" aria-label={`Select ${room.name}`}>
                     <rect x={left} y={top} width={widthPx} height={depthPx} fill={roomFill} stroke={isSelected ? "#375f4d" : "#2d4a39"} strokeWidth={isSelected ? 2.4 : 1.8} rx="4"/>
                     <g fill="#2a3c30" fontSize={insideLabel ? 10 : 9} fontWeight={700}>
                       {insideLabel ? (
@@ -517,15 +517,15 @@ export default function DesignPage() {
           <div className="design-summary">
             <div><span>Combined room area</span><strong>{totalArea.toFixed(2)} m²</strong></div>
             <div><span>Approx. footprint bounds</span><strong>{planBounds.width.toFixed(2)} × {planBounds.depth.toFixed(2)} m</strong></div>
-            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? `Overlap: ${validation.overlappingRoomIds.length} rooms` : "No overlaps"}</strong></div>
+            <div><span>Layout checks</span><strong className={hasOverlap ? "design-warning-text" : "design-ok-text"}>{hasOverlap ? `Overlap: ${validation.overlappingRoomIds.length} rooms` : "No overlap"}</strong></div>
           </div>
-          <p className="design-disclaimer">Concept layout only: this does not include wall thickness, doors, windows, structural columns, setbacks, ventilation, building codes or architect approved details.</p>
+          <p className="design-disclaimer">Concept layout only: this does not include wall thickness, doors, windows, structural columns, setbacks, ventilation, building codes or architect approval. It is a simple concept editor.</p>
         </section>
         <aside className="design-card design-editor-card">
           <div className="design-card-head"><div><span className="design-kicker">PLAN SETTINGS</span><h2>Make it yours</h2></div><Home size={19} color="#658369"/></div>
           <label className="design-label" htmlFor="design-name">Plan name</label>
           <input id="design-name" className="design-input" maxLength={100} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="My family home"/>
-          <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading}>Refresh</button></div>
+          <div className="design-room-toolbar"><label className="design-label" htmlFor="design-plot">Measured plot boundary</label><button type="button" onClick={reloadPlots} disabled={plotsLoading}><RefreshCw size={14}/> Refresh</button></div>
           <select id="design-plot" className="design-input" value={selectedPlotId} onChange={(event) => selectPlot(event.target.value)}>
             <option value="">No plot selected — concept mode</option>
             {savedPlots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name} · {plot.areaM2.toFixed(2)} m² · {plot.measurementMethod === "gps" ? "GPS estimate" : "Manual"}</option>)}
@@ -536,11 +536,11 @@ export default function DesignPage() {
             <strong className={plotFit.fits ? "design-ok-text" : "design-warning-text"}>{plotFit.fits ? "Rooms fit inside plot boundary" : "Layout does not fit plot boundary"}</strong>
             <p>Selected plot: {selectedPlot.name} · {selectedPlot.areaM2.toFixed(2)} m² · {selectedPlot.measurementMethod === "gps" ? "GPS-based estimate" : "Manually marked boundary"}</p>
             <ul>{plotFit.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
-            <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y coordinates.</p>
+            <p className="design-storage-note">Geometric estimate only. GPS-projected coordinates can be inaccurate and are not a legal survey. Layout origin is aligned to the plot’s minimum X/Y values.</p>
           </div>}
           <section className="design-candidate-panel" aria-labelledby="candidate-layout-heading">
             <div className="design-room-toolbar"><strong id="candidate-layout-heading">Try layout candidates</strong><span className="design-storage-note">Experimental</span></div>
-            <p className="design-storage-note">Creates simple row-packed concepts. When a saved plot is selected, candidates are checked against its actual polygon and use a small 0.1 m geometric tolerance.</p>
+            <p className="design-storage-note">Creates simple row-packed concepts. When a saved plot is selected, candidates are checked against its actual polygon and use a small 0.1 m geometric buffer.</p>
             <div className="design-field-grid">
               <label className="design-label">Rectangular width (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotWidth} onChange={(event) => setCandidatePlotWidth(Number(event.target.value) || 0)} /></label>
               <label className="design-label">Rectangular depth (m)<input className="design-input" type="number" min="1" max="200" step="0.5" value={candidatePlotDepth} onChange={(event) => setCandidatePlotDepth(Number(event.target.value) || 0)} /></label>
@@ -548,7 +548,7 @@ export default function DesignPage() {
             <button type="button" className="design-export" onClick={generateCandidates}>Generate layout options</button>
             {layoutCandidates.length > 0 && <div className="design-candidate-list">
               {layoutCandidates.map((candidate) => <article className="design-candidate-option" key={candidate.strategy}>
-                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : candidate.strategy === "deep-first" ? "Deeper rooms first" : candidate.strategy}</strong></div>
+                <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : candidate.strategy}</strong><span className="design-storage-note">{candidate.valid ? "Fits" : "Does not fit"}</span></div>
                 <p>{candidate.rooms.length} of {rooms.length} rooms placed · {selectedPlot ? "checked against saved plot boundary" : `${candidatePlotWidth} × ${candidatePlotDepth} m rectangle`}</p>
                 {candidate.errors.length > 0 && <ul>{candidate.errors.slice(0, 3).map((error, index) => <li key={index}>{error}</li>)}</ul>}
                 <button type="button" className="design-export" disabled={!candidate.valid} onClick={() => applyCandidate(candidate)}>Apply this candidate</button>
@@ -569,16 +569,16 @@ export default function DesignPage() {
             <button className="design-remove-room" type="button" onClick={removeRoom} disabled={rooms.length <= 1}><Trash2 size={14}/> Remove selected room</button>
           </div>}
           <section className="design-candidate-panel" aria-labelledby="openings-heading">
-            <div className="design-room-toolbar"><strong id="openings-heading">Doors & windows</strong><span className="design-storage-note">{openings.length} markers</span></div>
-            <p className="design-storage-note">Add simple wall markers to the selected room. Brown marks are doors; blue marks are windows. This prototype checks wall lengths and marker overlaps against the room geometry.</p>
+            <div className="design-room-toolbar"><strong id="openings-heading">Doors &amp; windows</strong><span className="design-storage-note">{openings.length} markers</span></div>
+            <p className="design-storage-note">Add simple wall markers to the selected room. Brown marks are doors; blue marks are windows. This prototype checks wall lengths and marker overlaps.</p>
             <div className="design-field-grid">
               <label className="design-label">Type<select className="design-input" value={openingKind} onChange={(event) => { const kind = event.target.value as OpeningKind; setOpeningKind(kind); }}><option value="door">Door</option><option value="window">Window</option></select></label>
               <label className="design-label">Wall<select className="design-input" value={openingWall} onChange={(event) => setOpeningWall(event.target.value as WallSide)}><option value="north">North</option><option value="east">East</option><option value="south">South</option><option value="west">West</option></select></label>
-              <label className="design-label">Offset (m)<input className="design-input" type="number" min="0" step="0.1" value={openingOffset} onChange={(event) => setOpeningOffset(Number(event.target.value) || 0)} /></label>
-              <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(Number(event.target.value) || 0)} /></label>
+              <label className="design-label">Offset (m)<input className="design-input" type="number" min="0" step="0.1" value={openingOffset} onChange={(event) => setOpeningOffset(Number(event.target.value))} /></label>
+              <label className="design-label">Width (m)<input className="design-input" type="number" min="0.1" step="0.1" value={openingWidth} onChange={(event) => setOpeningWidth(Number(event.target.value))} /></label>
             </div>
             <button type="button" className="design-export" onClick={addOpening} disabled={!selected}>Add to selected room</button>
-            <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}><Save size={15}/> Save doors & windows</button>
+            <button type="button" className="design-save" onClick={saveOpenings} disabled={!loaded || !openingValidation.valid}><Save size={15}/> Save doors &amp; windows</button>
             <div className="design-room-toolbar">
               <button type="button" className="design-export" onClick={exportOpenings}><Download size={14}/> Export openings</button>
               <label className="design-export design-import-label"><FileUp size={14}/> Import openings<input type="file" accept="application/json,.json" onChange={importOpenings}/></label>
@@ -587,10 +587,10 @@ export default function DesignPage() {
             {!openingValidation.valid && <ul className="design-warning-text">{openingValidation.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
             {openings.length > 0 && <div className="design-room-list">{openings.map((opening) => {
               const room = rooms.find((item) => item.id === opening.roomId);
-              return <div key={opening.id} className="design-room-option"><span>{opening.kind} · {room?.name ?? "Unknown room"} · {opening.wall}</span><small>{opening.offsetM} m offset · {opening.widthM} m wide</small></div>;
+              return <div key={opening.id} className="design-room-option"><span>{opening.kind} · {room?.name ?? "Unknown room"} · {opening.wall}</span><small>{opening.offsetM} m offset · {opening.widthM} m width</small></div>;
             })}</div>}
           </section>
-          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export</button><button type="button" className="design-export" onClick={() => window.print()}><Printer size={15}/> Print</button><button type="button" className="design-export" onClick={resetPlan}><RotateCcw size={15}/> Reset</button><label className="design-export design-import-label"><FileUp size={14}/> Import<input type="file" accept="application/json,.json" onChange={importPlan}/></label></div>
+          <div className="design-actions"><button type="button" className="design-save" onClick={savePlan} disabled={!loaded}><Save size={15}/> Save plan</button><button type="button" className="design-export" onClick={exportPlan}><Download size={15}/> Export plan</button><button type="button" className="design-export" onClick={resetPlan}><RotateCcw size={15}/> Reset</button></div>
           <p className="design-storage-note">Versioned design saved in this browser only. Older plans remain available as a legacy backup; export JSON before clearing browser data.</p>
         </aside>
       </div>
