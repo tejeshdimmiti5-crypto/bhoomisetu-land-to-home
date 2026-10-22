@@ -70,8 +70,8 @@ export default function HouseRequirementsWizard({ onGenerate, onCancel }: Props)
         <div className="requirements-icon"><House size={21}/></div>
         <div>
           <span className="design-kicker">PERSONALISE YOUR HOME</span>
-          <h2 id="requirements-title">Start with your family's needs</h2>
-          <p>Choose room types and quantities. We'll create room requirements and prepare layout options for the selected plot or entered rectangular dimensions.</p>
+          <h2 id="requirements-title">Start with your family&apos;s needs</h2>
+          <p>Choose room types and quantities. We&apos;ll create room requirements and prepare layout options for the selected plot or entered rectangular dimensions.</p>
         </div>
       </div>
       <div className="requirements-grid">
