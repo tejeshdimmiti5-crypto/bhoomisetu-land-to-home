@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import Link from "next/link";
 import { ArrowLeft, Download, FileUp, Plus, Save, Trash2, X } from "lucide-react";
 import { measurePolygon, type Point2D } from "../../lib/geometry";
+import { AREA_UNIT_LABELS, areaToSquareMetres, convertArea, type AreaUnit } from "../../lib/units";
 import { buildGpsCandidate, checkPendingGpsCandidate, isGpsEditorGenerationCurrent, MAX_PLOT_VERTICES } from "../../lib/gps-capture";
 import { isEditorSessionCurrent } from "../../lib/editor-session";
 import { deletePlot, exportPlots, importPlots, listPlots, requestPersistentStorage, savePlot, type SavedPlot } from "../../lib/plot-store";
@@ -16,6 +17,9 @@ function formatArea(area: number): string {
 
 export default function LandStudioPage() {
   const [name, setName] = useState("My first plot");
+  // Target area is a temporary comparison aid; it never mutates saved plot geometry.
+  const [targetArea, setTargetArea] = useState("4");
+  const [targetUnit, setTargetUnit] = useState<AreaUnit>("cent");
   const [ring, setRing] = useState<Point2D[]>(starterRing);
   const [activeId, setActiveId] = useState<string | undefined>();
   const [plots, setPlots] = useState<SavedPlot[]>([]);
@@ -39,6 +43,14 @@ export default function LandStudioPage() {
     try { return { value: measurePolygon(ring), error: "" }; }
     catch (cause) { return { value: null, error: cause instanceof Error ? cause.message : "Boundary is invalid." }; }
   }, [ring]);
+
+  const targetAreaResult = useMemo(() => {
+    if (targetArea.trim() === "") return { areaM2: null as number | null, error: "" };
+    const value = Number(targetArea);
+    if (!Number.isFinite(value) || value < 0) return { areaM2: null as number | null, error: "Enter a finite, non-negative target area." };
+    try { return { areaM2: areaToSquareMetres(value, targetUnit), error: "" }; }
+    catch { return { areaM2: null as number | null, error: "Enter a valid target area." }; }
+  }, [targetArea, targetUnit]);
 
   const refreshPlots = useCallback(async () => {
     try { setPlots(await listPlots()); }
@@ -404,6 +416,26 @@ export default function LandStudioPage() {
               </div>
               <div className="studio-metric"><span>Area</span><strong>{formatArea(measurements.value.areaM2)} m²</strong></div>
               <div className="studio-metric"><span>Area (square feet)</span><strong>{formatArea(measurements.value.areaM2 * 10.7639104167)} ft²</strong></div>
+              <div className="studio-target-area" aria-labelledby="target-area-heading">
+                <h3 id="target-area-heading">Compare with target area</h3>
+                <p>Enter the area you expect, such as 4 cents. This does not change your boundary.</p>
+                <div className="studio-target-controls">
+                  <label className="studio-field-label" htmlFor="target-area-value">Target area
+                    <input className="studio-text-input" id="target-area-value" type="number" min="0" step="any" value={targetArea} onChange={(event) => setTargetArea(event.target.value)} />
+                  </label>
+                  <label className="studio-field-label" htmlFor="target-area-unit">Unit
+                    <select className="studio-text-input" id="target-area-unit" value={targetUnit} onChange={(event) => setTargetUnit(event.target.value as AreaUnit)}>
+                      {(Object.keys(AREA_UNIT_LABELS) as AreaUnit[]).map((unit) => <option key={unit} value={unit}>{unit === "m2" ? "Square metres (m²)" : unit === "ft2" ? "Square feet (ft²)" : unit === "yd2" ? "Square yards (yd²)" : unit === "acre" ? "Acres" : unit === "cent" ? "Cents" : "Guntas"}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {targetAreaResult.error && <p className="studio-target-error" role="alert">{targetAreaResult.error}</p>}
+                {targetAreaResult.areaM2 !== null && <div className="studio-target-result" role="status">
+                  <span>Calculated boundary vs target</span>
+                  <strong>Measured: {formatArea(convertArea(measurements.value.areaM2, "m2", targetUnit))} {targetUnit === "cent" ? "cents" : targetUnit === "gunta" ? "guntas" : AREA_UNIT_LABELS[targetUnit]}</strong>
+                  <span>Difference: {formatArea(Math.abs(convertArea(measurements.value.areaM2, "m2", targetUnit) - Number(targetArea)))} {targetUnit === "cent" ? "cents" : targetUnit === "gunta" ? "guntas" : AREA_UNIT_LABELS[targetUnit]} · {targetAreaResult.areaM2 === 0 ? "Target is zero; percentage difference unavailable." : formatArea(Math.abs(measurements.value.areaM2 - targetAreaResult.areaM2) / targetAreaResult.areaM2 * 100) + "% from target"}</span>
+                </div>}
+              </div>
               <div className="studio-metric"><span>Perimeter</span><strong>{formatArea(measurements.value.perimeterM)} m</strong></div>
               <div className="studio-metric"><span>Boundary points</span><strong>{measurements.value.vertexCount}</strong></div>
               <p className="studio-measure-note">{captureMethod === "gps" ? "GPS-assisted local planar estimate. Accuracy varies with device, sky visibility and environment; not a legal survey." : "Planar estimate only. Legal boundaries and local survey rules are not assessed by this editor."}</p>
