@@ -432,8 +432,8 @@ export default function LandStudioPage() {
                 {targetAreaResult.error && <p className="studio-target-error" role="alert">{targetAreaResult.error}</p>}
                 {targetAreaResult.areaM2 !== null && <div className="studio-target-result" role="status">
                   <span>Calculated boundary vs target</span>
-                  <strong>{formatArea(convertArea(measurements.value.areaM2, "m2", targetUnit))} {AREA_UNIT_LABELS[targetUnit]} measured</strong>
-                  <span>{formatArea(Math.abs(measurements.value.areaM2 - targetAreaResult.areaM2))} m² difference · {targetAreaResult.areaM2 === 0 ? "Target is zero; percentage difference unavailable." : formatArea(Math.abs(measurements.value.areaM2 - targetAreaResult.areaM2) / targetAreaResult.areaM2 * 100) + "% from target"}</span>
+                  <strong>Measured: {formatArea(convertArea(measurements.value.areaM2, "m2", targetUnit))} {targetUnit === "cent" ? "cents" : targetUnit === "gunta" ? "guntas" : AREA_UNIT_LABELS[targetUnit]}</strong>
+                  <span>Difference: {formatArea(Math.abs(convertArea(measurements.value.areaM2, "m2", targetUnit) - Number(targetArea)))} {targetUnit === "cent" ? "cents" : targetUnit === "gunta" ? "guntas" : AREA_UNIT_LABELS[targetUnit]} · {targetAreaResult.areaM2 === 0 ? "Target is zero; percentage difference unavailable." : formatArea(Math.abs(measurements.value.areaM2 - targetAreaResult.areaM2) / targetAreaResult.areaM2 * 100) + "% from target"}</span>
                 </div>}
               </div>
               <div className="studio-metric"><span>Perimeter</span><strong>{formatArea(measurements.value.perimeterM)} m</strong></div>
