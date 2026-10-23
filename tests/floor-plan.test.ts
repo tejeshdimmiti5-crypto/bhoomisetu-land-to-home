@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { roomsOverlap, validateFloorPlanRooms, type FloorPlanRoom } from "../lib/floor-plan";
+import { buildFloorPlanAnnotations, formatMetricDimension, formatRoomDimensionLabel, roomsOverlap, validateFloorPlanRooms, type FloorPlanRoom } from "../lib/floor-plan";
 
 const rooms: FloorPlanRoom[] = [
   { id: "living", name: "Living", x: 0, y: 0, width: 5, depth: 4 },
@@ -54,4 +54,28 @@ test("non-array input is rejected safely", () => {
   const result = validateFloorPlanRooms({ rooms: [] });
   assert.equal(result.valid, false);
   assert.deepEqual(result.errors, ["Rooms must be an array."]);
+});
+
+test("dimension helpers format metric values and room labels from actual geometry", () => {
+  assert.equal(formatMetricDimension(8.5), "8.50 m");
+  assert.equal(formatRoomDimensionLabel({ name: "Bedroom 1", width: 3.5, depth: 4 }), "Bedroom 1: 3.50 m × 4.00 m");
+
+  const annotations = buildFloorPlanAnnotations(rooms);
+  assert.equal(annotations.valid, true);
+  assert.equal(annotations.overallLabel, "8.00 m × 7.00 m");
+  assert.deepEqual(annotations.roomLabels.map((room) => room.label), [
+    "Living: 5.00 m × 4.00 m",
+    "Bedroom: 3.00 m × 4.00 m",
+    "Kitchen: 3.00 m × 3.00 m",
+  ]);
+});
+
+test("buildFloorPlanAnnotations rejects invalid or incomplete room geometry", () => {
+  const result = buildFloorPlanAnnotations([
+    { id: "bad", name: " ", x: 0, y: 0, width: 0, depth: 3 },
+  ] as unknown as FloorPlanRoom[]);
+  assert.equal(result.valid, false);
+  assert.equal(result.overallLabel, "Unavailable");
+  assert.deepEqual(result.roomLabels, []);
+  assert.ok(result.errors.length > 0);
 });
