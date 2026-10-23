@@ -106,11 +106,22 @@ export function calculateEstimate(input: unknown): EstimateResult {
     const wastageAmountINR = baseAmountINR * item.wastagePercent / 100;
     return { ...item, baseAmountINR, wastageAmountINR, totalINR: baseAmountINR + wastageAmountINR };
   });
+  if (lineItems.some((item) =>
+    !Number.isFinite(item.baseAmountINR) ||
+    !Number.isFinite(item.wastageAmountINR) ||
+    !Number.isFinite(item.totalINR)
+  )) {
+    return { ...empty, errors: ["Calculated line-item total exceeds the supported numeric range. Reduce the quantity or rate."] };
+  }
   const subtotalINR = lineItems.reduce((sum, item) => sum + item.baseAmountINR, 0);
   const totalWastageINR = lineItems.reduce((sum, item) => sum + item.wastageAmountINR, 0);
+  const totalINR = subtotalINR + totalWastageINR;
+  if (![subtotalINR, totalWastageINR, totalINR].every(Number.isFinite)) {
+    return { ...empty, errors: ["Calculated estimate total exceeds the supported numeric range. Reduce quantities, rates, or line items."] };
+  }
   return {
     valid: true, errors: [], currency: "INR", lineItems, subtotalINR, totalWastageINR,
-    totalINR: subtotalINR + totalWastageINR,
+    totalINR,
     coverage: lineItems.length ? "complete-input" : "no-line-items",
     disclaimer: "Planning estimate only. Rates and quantities require independent review; this is not a contractor quote or guarantee.",
   };
