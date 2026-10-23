@@ -175,24 +175,25 @@ export default function DesignPage() {
     const markerIndex = styleWithSpecial.indexOf(specialMarker);
     const style = markerIndex >= 0 ? styleWithSpecial.slice(0, markerIndex) : styleWithSpecial;
     const special = markerIndex >= 0 ? styleWithSpecial.slice(markerIndex + specialMarker.length).trim() : "";
-    setPlanName(`${style} family home`);
     const requirements = requirementRooms.map(({ id, name, width, depth }) => ({ id, name, width, depth }));
     const generated = selectedPlot
       ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
       : generateRectangularLayoutCandidates(requirements, candidatePlotWidth, candidatePlotDepth);
     const firstValidCandidate = generated.find((candidate) => candidate.valid);
-    const previewRooms = firstValidCandidate?.rooms ?? requirementRooms;
-    setRooms(previewRooms);
-    setSelectedId(previewRooms[0]?.id ?? "");
     setLayoutCandidates(generated);
     setRequirementsOpen(false);
-    if (generated.length === 0) {
-      setNotice("Your room requirements were created, but no candidates could be generated. Check plot dimensions and room sizes.");
-    } else {
-      const fitting = generated.filter((candidate) => candidate.valid).length;
-      const preferenceNote = special.trim() ? ` Special request recorded for review: ${special.trim()}.` : "";
-      setNotice(`Created ${requirementRooms.length} requested spaces in a ${style} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
+    if (!firstValidCandidate) {
+      setNotice(generated.length === 0
+        ? "No layout candidates could be generated. Your current room plan was left unchanged; check plot dimensions and room sizes."
+        : "No candidate fits the selected plot or rectangle. Your current room plan was left unchanged; adjust the plot or reduce room requirements, then try again.");
+      return;
     }
+    setPlanName(`${style} family home`);
+    setRooms(firstValidCandidate.rooms);
+    setSelectedId(firstValidCandidate.rooms[0]?.id ?? "");
+    const fitting = generated.filter((candidate) => candidate.valid).length;
+    const preferenceNote = special.trim() ? ` Special request recorded for review: ${special.trim()}.` : "";
+    setNotice(`Created ${requirementRooms.length} requested spaces in a ${style} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
   }
 
   function generateCandidates() {
