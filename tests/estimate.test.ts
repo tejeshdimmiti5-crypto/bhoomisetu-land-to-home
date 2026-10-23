@@ -74,3 +74,25 @@ test("rejects unknown schema, unsupported currency and malformed top-level input
   assert.equal(calculateEstimate({ ...input, schemaVersion: 2 }).valid, false);
   assert.equal(calculateEstimate({ ...input, currency: "USD" }).valid, false);
 });
+
+
+test("rejects finite inputs whose multiplication overflows", () => {
+  const result = calculateEstimate({
+    ...input,
+    items: [{ ...input.items[0], quantity: Number.MAX_VALUE, unitRateINR: Number.MAX_VALUE }],
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors[0], /numeric range/);
+});
+
+test("rejects finite line totals whose aggregate overflows", () => {
+  const result = calculateEstimate({
+    ...input,
+    items: [
+      { ...input.items[0], id: "one", quantity: 1e308, unitRateINR: 1 },
+      { ...input.items[0], id: "two", quantity: 1e308, unitRateINR: 1 },
+    ],
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors[0], /numeric range/);
+});

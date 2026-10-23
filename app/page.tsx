@@ -222,6 +222,16 @@ export default function HomePage() {
             </div>
           </section>
 
+          <section className="features-section" id="services" aria-labelledby="services-heading">
+            <div className="section-heading compact-heading">
+              <div><span className="section-kicker">BEFORE YOU HIRE</span><h2 id="services-heading">Choosing building services</h2></div>
+            </div>
+            <div className="demo-notice" role="note">
+              <strong>No provider verification is offered here</strong>
+              <span>BhoomiSetu does not currently maintain a verified contractor or service-provider directory. Independently check registrations, references, written scope, itemized quotes, and payment terms before hiring anyone.</span>
+            </div>
+          </section>
+
           <section className="bottom-banner" id="documents"><div className="banner-sparkle"><Sparkles size={22} /></div><div><h2>Big plans start with one small step.</h2><p>Start by mapping your land. We’ll take it from there, one decision at a time.</p></div><button className="banner-button" onClick={() => setShowCreate(true)}>Let’s get started <ArrowRight size={16} /></button></section>
           <footer className="footer"><span>© 2026 BhoomiSetu · Made for the journey home.</span><span><ShieldCheck size={13} /> Your plans deserve care.</span></footer>
         </div>

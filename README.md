@@ -4,7 +4,7 @@ BhoomiSetu is a local-first planning prototype for capturing a plot, exploring a
 
 ## Current branch status
 
-The active feature branch is `feat/land-studio-local-persistence`. Review and merge changes through the open draft PR; do not treat this branch as released production software.
+The default branch is `main`. The deployed application is a local-first planning prototype; a successful deployment does not make it a production CAD/BIM or survey system.
 
 ### Implemented in this branch
 
