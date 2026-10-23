@@ -179,21 +179,17 @@ export default function DesignPage() {
     const generated = selectedPlot
       ? generatePlotLayoutCandidates(requirements, selectedPlot.ring)
       : generateRectangularLayoutCandidates(requirements, candidatePlotWidth, candidatePlotDepth);
-    const firstValidCandidate = generated.find((candidate) => candidate.valid);
     setLayoutCandidates(generated);
     setRequirementsOpen(false);
-    if (!firstValidCandidate) {
+    const fitting = generated.filter((candidate) => candidate.valid).length;
+    if (fitting === 0) {
       setNotice(generated.length === 0
         ? "No layout candidates could be generated. Your current room plan was left unchanged; check plot dimensions and room sizes."
         : "No candidate fits the selected plot or rectangle. Your current room plan was left unchanged; adjust the plot or reduce room requirements, then try again.");
       return;
     }
-    setPlanName(`${style} family home`);
-    setRooms(firstValidCandidate.rooms);
-    setSelectedId(firstValidCandidate.rooms[0]?.id ?? "");
-    const fitting = generated.filter((candidate) => candidate.valid).length;
     const preferenceNote = special.trim() ? ` Special request recorded for review: ${special.trim()}.` : "";
-    setNotice(`Created ${requirementRooms.length} requested spaces in a ${style} concept and generated ${generated.length} layout options; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Review before applying.`);
+    setNotice(`Generated ${generated.length} candidate layouts for ${requirementRooms.length} requested spaces; ${fitting} fit the current ${selectedPlot ? "saved plot boundary" : "rectangular dimensions"}.${preferenceNote} Compare the options and apply one only after reviewing it. Your current plan has not been replaced.`);
   }
 
   function generateCandidates() {
@@ -550,7 +546,7 @@ export default function DesignPage() {
             {layoutCandidates.length > 0 && <div className="design-candidate-list">
               {layoutCandidates.map((candidate) => <article className="design-candidate-option" key={candidate.strategy}>
                 <div className="design-room-toolbar"><strong>{candidate.strategy === "requested-order" ? "Requested order" : candidate.strategy === "wide-first" ? "Wider rooms first" : candidate.strategy}</strong><span className="design-storage-note">{candidate.valid ? "Fits" : "Does not fit"}</span></div>
-                <p>{candidate.rooms.length} of {rooms.length} rooms placed · {selectedPlot ? "checked against saved plot boundary" : `${candidatePlotWidth} × ${candidatePlotDepth} m rectangle`}</p>
+                <p>{candidate.rooms.length} of {candidate.rooms.length} rooms placed · {selectedPlot ? "checked against saved plot boundary" : `${candidatePlotWidth} × ${candidatePlotDepth} m rectangle`}</p>
                 {candidate.errors.length > 0 && <ul>{candidate.errors.slice(0, 3).map((error, index) => <li key={index}>{error}</li>)}</ul>}
                 <button type="button" className="design-export" disabled={!candidate.valid} onClick={() => applyCandidate(candidate)}>Apply this candidate</button>
               </article>)}
